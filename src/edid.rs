@@ -110,10 +110,54 @@ fn descriptor_text(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_manufacturer;
+    use super::{decode_manufacturer, parse_edid};
 
     #[test]
     fn decodes_eisa_manufacturer() {
         assert_eq!(decode_manufacturer(0x10ac), "DEL");
+    }
+
+    #[test]
+    fn rejects_short_or_invalid_header() {
+        assert!(parse_edid(&[0u8; 127]).is_none());
+        assert!(parse_edid(&[0u8; 128]).is_none());
+    }
+
+    #[test]
+    fn parses_identity_and_text_descriptors() {
+        let mut edid = [0u8; 128];
+        edid[..8].copy_from_slice(&[0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00]);
+        edid[8..10].copy_from_slice(&0x10acu16.to_be_bytes());
+        edid[10..12].copy_from_slice(&0x1234u16.to_le_bytes());
+        edid[12..16].copy_from_slice(&0x01020304u32.to_le_bytes());
+        edid[16] = 12;
+        edid[17] = 30;
+        edid[18] = 1;
+        edid[19] = 4;
+        edid[20] = 0x80;
+        edid[21] = 60;
+        edid[22] = 34;
+        edid[23] = 120;
+
+        let name = b"ExamplePanel\n";
+        edid[54] = 0;
+        edid[55] = 0;
+        edid[56] = 0;
+        edid[57] = 0xfc;
+        edid[58] = 0;
+        edid[59..59 + name.len()].copy_from_slice(name);
+
+        let checksum = edid[..127]
+            .iter()
+            .fold(0u8, |sum, value| sum.wrapping_add(*value));
+        edid[127] = 0u8.wrapping_sub(checksum);
+
+        let fields = parse_edid(&edid).expect("valid EDID should parse");
+        assert_eq!(fields.get("EDID Manufacturer").map(String::as_str), Some("DEL"));
+        assert_eq!(fields.get("EDID Product Code").map(String::as_str), Some("4660"));
+        assert_eq!(fields.get("EDID Numeric Serial").map(String::as_str), Some("16909060"));
+        assert_eq!(fields.get("Manufacture Year").map(String::as_str), Some("2020"));
+        assert_eq!(fields.get("Monitor Name").map(String::as_str), Some("ExamplePanel"));
+        assert_eq!(fields.get("Base Block Checksum").map(String::as_str), Some("true"));
     }
 }
