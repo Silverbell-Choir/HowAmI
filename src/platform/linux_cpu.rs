@@ -34,9 +34,13 @@ pub fn collect() -> Section {
         let package = read_i32(path.join("topology/physical_package_id"));
         let core = read_i32(path.join("topology/core_id"));
         if let Some(package_id) = package {
-            packages.insert(package_id);
-            if let Some(core_id) = core {
-                cores.insert((package_id, core_id));
+            if package_id >= 0 {
+                packages.insert(package_id);
+                if let Some(core_id) = core {
+                    if core_id >= 0 {
+                        cores.insert((package_id, core_id));
+                    }
+                }
             }
         }
 
