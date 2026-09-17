@@ -13,6 +13,8 @@ mod linux_supplement;
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(target_os = "windows")]
+mod windows_extra;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Collection {
@@ -23,7 +25,17 @@ pub struct Collection {
 pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
     {
-        return windows::collect();
+        let mut collection = windows::collect()?;
+        match windows_extra::collect() {
+            Ok(extra) => {
+                collection.sections.extend(extra.sections);
+                collection.warnings.extend(extra.warnings);
+            }
+            Err(error) => collection
+                .warnings
+                .push(format!("Windows supplemental collector failed: {error}")),
+        }
+        return Ok(collection);
     }
 
     #[cfg(target_os = "macos")]
