@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
+mod linux_cpu;
+#[cfg(target_os = "linux")]
+mod linux_storage;
+#[cfg(target_os = "linux")]
 mod linux_supplement;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -30,6 +34,8 @@ pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     #[cfg(target_os = "linux")]
     {
         let mut collection = linux::collect()?;
+        collection.sections.push(linux_cpu::collect());
+        collection.sections.extend(linux_storage::collect());
         collection.sections.extend(linux_supplement::collect());
         return Ok(collection);
     }
