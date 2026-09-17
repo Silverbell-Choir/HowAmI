@@ -1,5 +1,8 @@
 use crate::model::{DeviceRecord, Section};
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub fn collect() -> Vec<Section> {
     vec![
@@ -20,7 +23,7 @@ fn collect_gpus() -> Section {
     };
 
     for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
+        let name = entry.file_name().to_string_lossy().into_owned();
         let Some(index) = name.strip_prefix("card") else {
             continue;
         };
@@ -50,7 +53,9 @@ fn collect_gpus() -> Section {
 
         if let Some(driver) = symlink_file_name(device.join("driver")) {
             record.insert("driver", driver.clone());
-            if let Some(version) = read_trimmed(Path::new("/sys/module").join(&driver).join("version")) {
+            if let Some(version) =
+                read_trimmed(Path::new("/sys/module").join(&driver).join("version"))
+            {
                 record.insert("driver_version", version);
             }
         }
@@ -103,7 +108,7 @@ fn collect_power_supplies() -> Section {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let mut record = DeviceRecord::new(entry.file_name().to_string_lossy());
+        let mut record = DeviceRecord::new(entry.file_name().to_string_lossy().into_owned());
         for field in fields {
             if let Some(value) = read_trimmed(path.join(field)) {
                 record.insert(field, value);
@@ -127,14 +132,14 @@ fn collect_hwmon() -> Section {
     for entry in entries.flatten() {
         let path = entry.path();
         let label = read_trimmed(path.join("name"))
-            .unwrap_or_else(|| entry.file_name().to_string_lossy().to_string());
+            .unwrap_or_else(|| entry.file_name().to_string_lossy().into_owned());
         let mut record = DeviceRecord::new(label);
 
         let Ok(files) = fs::read_dir(&path) else {
             continue;
         };
         for file in files.flatten() {
-            let field = file.file_name().to_string_lossy().to_string();
+            let field = file.file_name().to_string_lossy().into_owned();
             if !is_sensor_field(&field) {
                 continue;
             }
@@ -152,7 +157,9 @@ fn collect_hwmon() -> Section {
 }
 
 fn is_sensor_field(name: &str) -> bool {
-    let prefixes = ["temp", "fan", "in", "curr", "power", "energy", "humidity", "pwm"];
+    let prefixes = [
+        "temp", "fan", "in", "curr", "power", "energy", "humidity", "pwm",
+    ];
     let suffixes = [
         "_input",
         "_label",
@@ -191,8 +198,7 @@ fn split_alsa_cards(text: &str) -> Vec<DeviceRecord> {
     let mut current: Option<DeviceRecord> = None;
 
     for line in text.lines() {
-        let trimmed = line.trim_end();
-        let leading_trimmed = trimmed.trim_start();
+        let leading_trimmed = line.trim_end().trim_start();
         let starts_card = leading_trimmed
             .split_once(' ')
             .map(|(first, _)| first.chars().all(|ch| ch.is_ascii_digit()))
@@ -232,7 +238,11 @@ fn collect_input_devices() -> Section {
         return section;
     };
 
-    for (index, block) in text.split("\n\n").filter(|block| !block.trim().is_empty()).enumerate() {
+    for (index, block) in text
+        .split("\n\n")
+        .filter(|block| !block.trim().is_empty())
+        .enumerate()
+    {
         let mut record = DeviceRecord::new(format!("Input Device {}", index + 1));
         for line in block.lines() {
             let line = line.trim();
@@ -241,16 +251,22 @@ fn collect_input_devices() -> Section {
                 record.label = value.to_string();
                 record.insert("Name", value);
             } else if let Some((prefix, value)) = line.split_once(':') {
-                let key = match prefix {
-                    "I" => "ID",
-                    "P" => "PhysicalPath",
-                    "S" => "SysfsPath",
-                    "U" => "UniqueId",
-                    "H" => "Handlers",
-                    "B" => "Bitmap",
-                    _ => continue,
-                };
-                record.insert(key, value.trim());
+                let value = value.trim();
+                match prefix {
+                    "I" => record.insert("ID", value),
+                    "P" => record.insert("PhysicalPath", value),
+                    "S" => record.insert("SysfsPath", value),
+                    "U" => record.insert("UniqueId", value),
+                    "H" => record.insert("Handlers", value),
+                    "B" => {
+                        if let Some((bitmap_name, bitmap_value)) = value.split_once('=') {
+                            record.insert(format!("Bitmap.{bitmap_name}"), bitmap_value);
+                        } else {
+                            record.insert("Bitmap", value);
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
         if !record.fields.is_empty() {
@@ -270,7 +286,7 @@ fn collect_bluetooth() -> Section {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let mut record = DeviceRecord::new(entry.file_name().to_string_lossy());
+        let mut record = DeviceRecord::new(entry.file_name().to_string_lossy().into_owned());
         for field in ["address", "name", "manufacturer", "product", "serial"] {
             if let Some(value) = read_trimmed(path.join(field)) {
                 record.insert(field, value);
@@ -278,7 +294,9 @@ fn collect_bluetooth() -> Section {
         }
         if let Some(driver) = symlink_file_name(path.join("device/driver")) {
             record.insert("driver", driver.clone());
-            if let Some(version) = read_trimmed(Path::new("/sys/module").join(&driver).join("version")) {
+            if let Some(version) =
+                read_trimmed(Path::new("/sys/module").join(&driver).join("version"))
+            {
                 record.insert("driver_version", version);
             }
         }
@@ -299,6 +317,8 @@ fn read_trimmed(path: PathBuf) -> Option<String> {
 
 fn symlink_file_name(path: PathBuf) -> Option<String> {
     fs::read_link(path).ok().and_then(|target| {
-        target.file_name().map(|name| name.to_string_lossy().to_string())
+        target
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
     })
 }
