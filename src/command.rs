@@ -1,6 +1,6 @@
 use std::{
     io::{self, Read},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, ExitStatus, Stdio},
     thread,
     time::{Duration, Instant},
@@ -103,7 +103,7 @@ pub fn linux_program(name: &str) -> Option<PathBuf> {
     const TRUSTED_DIRS: &[&str] = &["/usr/bin", "/bin", "/usr/sbin", "/sbin"];
     TRUSTED_DIRS
         .iter()
-        .map(|dir| Path::new(dir).join(name))
+        .map(|dir| std::path::Path::new(dir).join(name))
         .find(|path| path.is_file())
 }
 
