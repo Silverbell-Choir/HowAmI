@@ -1,0 +1,8 @@
+/target/
+**/*.rs.bk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+HowAmI_Report_*.txt
+HowAmI_Report_*.json
