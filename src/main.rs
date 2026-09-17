@@ -8,7 +8,7 @@ mod platform;
 mod report;
 
 use chrono::Local;
-use model::{ReportMeta, SystemReport};
+use model::{ReportMeta, SystemReport, REPORT_SCHEMA_VERSION};
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -187,6 +187,7 @@ fn build_report(
 ) -> SystemReport {
     SystemReport {
         meta: ReportMeta {
+            schema_version: REPORT_SCHEMA_VERSION,
             app_name: "HowAmI".into(),
             app_version: env!("CARGO_PKG_VERSION").into(),
             generated_at: Local::now().to_rfc3339(),
