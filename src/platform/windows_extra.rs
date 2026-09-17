@@ -95,8 +95,8 @@ $memoryArrayRecords = @(Get-CimInstance Win32_PhysicalMemoryArray | ForEach-Obje
         LocationCode = $_.Location
         UseCode = $_.Use
         MemoryErrorCorrectionCode = $_.MemoryErrorCorrection
-        MaximumCapacityKB = $_.MaxCapacity
-        MaximumCapacityBytes = $_.MaxCapacityEx
+        MaxCapacityLegacyRaw = $_.MaxCapacity
+        MaxCapacityExKB = $_.MaxCapacityEx
         NumberOfMemoryDevices = $_.MemoryDevices
     })
 })
@@ -126,19 +126,24 @@ if ((Get-Command Get-PhysicalDisk -ErrorAction SilentlyContinue) -and (Get-Comma
             $reliabilityRecords += New-Record $disk.FriendlyName ([ordered]@{
                 DeviceId = $disk.DeviceId
                 SerialNumber = $disk.SerialNumber
+                ManufactureDate = $counter.ManufactureDate
                 TemperatureCelsius = $counter.Temperature
                 TemperatureMaxCelsius = $counter.TemperatureMax
                 WearPercent = $counter.Wear
                 PowerOnHours = $counter.PowerOnHours
                 ReadErrorsTotal = $counter.ReadErrorsTotal
+                ReadErrorsCorrected = $counter.ReadErrorsCorrected
                 ReadErrorsUncorrected = $counter.ReadErrorsUncorrected
                 WriteErrorsTotal = $counter.WriteErrorsTotal
+                WriteErrorsCorrected = $counter.WriteErrorsCorrected
                 WriteErrorsUncorrected = $counter.WriteErrorsUncorrected
-                ReadLatencyMax = $counter.ReadLatencyMax
-                WriteLatencyMax = $counter.WriteLatencyMax
-                FlushLatencyMax = $counter.FlushLatencyMax
+                ReadLatencyMaxMilliseconds = $counter.ReadLatencyMax
+                WriteLatencyMaxMilliseconds = $counter.WriteLatencyMax
+                FlushLatencyMaxMilliseconds = $counter.FlushLatencyMax
                 StartStopCycleCount = $counter.StartStopCycleCount
+                StartStopCycleCountMax = $counter.StartStopCycleCountMax
                 LoadUnloadCycleCount = $counter.LoadUnloadCycleCount
+                LoadUnloadCycleCountMax = $counter.LoadUnloadCycleCountMax
             })
         }
     }
