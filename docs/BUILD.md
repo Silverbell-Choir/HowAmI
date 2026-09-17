@@ -33,8 +33,6 @@ sh scripts/validate-unix.sh
 
 ### Windows
 
-기본 빌드:
-
 ```powershell
 cargo build --release --locked
 .\target\release\HowAmI.exe
@@ -126,6 +124,8 @@ HowAmI-macOS-arm64
 HowAmI-Linux-x64
 HowAmI-Linux-arm64
 ```
+
+**빌드된 실행 파일은 Git 소스 트리에 커밋하지 않습니다.** 배포용 바이너리와 `SHA256SUMS.txt`, 선택적인 `BUILD-INFO.md`는 각 버전의 GitHub Release 자산으로 제공합니다.
 
 ### 권장 확인 항목
 
@@ -264,6 +264,8 @@ HowAmI-macOS-arm64
 HowAmI-Linux-x64
 HowAmI-Linux-arm64
 ```
+
+**Compiled binaries are not committed to the Git source tree.** Distribution binaries, `SHA256SUMS.txt`, and an optional `BUILD-INFO.md` are published as assets on the corresponding GitHub Release.
 
 ### Recommended checks
 
