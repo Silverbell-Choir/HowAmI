@@ -81,7 +81,7 @@ fn run_windows(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Err
     let exe = powershell_single_quote(&exe.to_string_lossy());
     let handoff = powershell_single_quote(&handoff.to_string_lossy());
     let script = format!(
-        "$a = '--elevated-child \"' + '{handoff}' + '\"'; $p = Start-Process -FilePath '{exe}' -Verb RunAs -ArgumentList $a -Wait -PassThru; exit $p.ExitCode"
+        "$ErrorActionPreference='Stop'; try {{ $a = '--elevated-child \"' + '{handoff}' + '\"'; $p = Start-Process -FilePath '{exe}' -Verb RunAs -ArgumentList $a -Wait -PassThru; exit [int]$p.ExitCode }} catch {{ exit 1 }}"
     );
 
     let status = Command::new(powershell)
