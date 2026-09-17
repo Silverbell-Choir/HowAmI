@@ -6,6 +6,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(target_os = "windows")]
+#[link(name = "kernel32")]
+extern "system" {
+    #[link_name = "GetSystemDirectoryW"]
+    fn get_system_directory_w(buffer: *mut u16, size: u32) -> u32;
+}
+
 #[derive(Debug)]
 pub struct CapturedOutput {
     pub status: ExitStatus,
@@ -73,11 +80,19 @@ fn join_reader(
 
 #[cfg(target_os = "windows")]
 pub fn windows_powershell() -> io::Result<PathBuf> {
-    let root = std::env::var_os("SystemRoot")
-        .map(PathBuf::from)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "SystemRoot is unavailable"))?;
-    let path = root
-        .join("System32")
+    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+
+    let mut buffer = vec![0u16; 32768];
+    let length = unsafe { get_system_directory_w(buffer.as_mut_ptr(), buffer.len() as u32) };
+    if length == 0 || length as usize >= buffer.len() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Windows system directory could not be resolved",
+        ));
+    }
+
+    let system_dir = PathBuf::from(OsString::from_wide(&buffer[..length as usize]));
+    let path = system_dir
         .join("WindowsPowerShell")
         .join("v1.0")
         .join("powershell.exe");
