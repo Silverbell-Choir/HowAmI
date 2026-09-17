@@ -1,5 +1,8 @@
 use crate::model::{DeviceRecord, Section};
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub fn collect() -> Vec<Section> {
     vec![collect_nvme(), collect_block_device_state()]
@@ -38,7 +41,9 @@ fn collect_nvme() -> Section {
         }
         if let Some(driver) = symlink_file_name(path.join("device/driver")) {
             record.insert("driver", driver.clone());
-            if let Some(version) = read_trimmed(Path::new("/sys/module").join(&driver).join("version")) {
+            if let Some(version) =
+                read_trimmed(Path::new("/sys/module").join(&driver).join("version"))
+            {
                 record.insert("driver_version", version);
             }
         }
@@ -65,12 +70,20 @@ fn collect_block_device_state() -> Section {
         let path = entry.path();
         let mut record = DeviceRecord::new(name);
 
+        if let Some(value) = read_trimmed(path.join("size")) {
+            record.insert("SizeSectors512", value.clone());
+            if let Ok(sectors) = value.parse::<u64>() {
+                if let Some(bytes) = sectors.checked_mul(512) {
+                    record.insert("SizeBytes", bytes.to_string());
+                }
+            }
+        }
+
         for (field, relative) in [
-            ("SizeSectors", "size"),
             ("ReadOnly", "ro"),
             ("Removable", "removable"),
-            ("LogicalBlockSize", "queue/logical_block_size"),
-            ("PhysicalBlockSize", "queue/physical_block_size"),
+            ("LogicalBlockSizeBytes", "queue/logical_block_size"),
+            ("PhysicalBlockSizeBytes", "queue/physical_block_size"),
             ("Rotational", "queue/rotational"),
             ("Scheduler", "queue/scheduler"),
             ("Vendor", "device/vendor"),
@@ -87,7 +100,9 @@ fn collect_block_device_state() -> Section {
 
         if let Some(driver) = symlink_file_name(path.join("device/driver")) {
             record.insert("driver", driver.clone());
-            if let Some(version) = read_trimmed(Path::new("/sys/module").join(&driver).join("version")) {
+            if let Some(version) =
+                read_trimmed(Path::new("/sys/module").join(&driver).join("version"))
+            {
                 record.insert("driver_version", version);
             }
         }
@@ -109,6 +124,8 @@ fn read_trimmed(path: PathBuf) -> Option<String> {
 
 fn symlink_file_name(path: PathBuf) -> Option<String> {
     fs::read_link(path).ok().and_then(|target| {
-        target.file_name().map(|name| name.to_string_lossy().into_owned())
+        target
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
     })
 }
