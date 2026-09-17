@@ -2,29 +2,37 @@
 
 - Source commit / 소스 커밋: `d96388c5022f0c80720eb3e5d606d24241456e23`
 - Build date / 빌드 날짜: 2026-09-17
-- CI: not used / 사용하지 않음
 - Rust stable: `rustc 1.98.1`, `cargo 1.98.1`
-- Minimum-version check / 최소 버전 확인: `rustc/cargo 1.74.0` Windows x64 test and release build passed
+- Minimum Rust check / 최소 Rust 확인: Windows x64에서 `rustc/cargo 1.74.0` test 및 release build 통과
 
 ## Included artifacts / 포함 산출물
 
-| File | Target | Size | Build and validation |
+| File | Target | Size | Validation / 검증 |
 | --- | --- | ---: | --- |
-| `HowAmI-Windows-x64.exe` | `x86_64-pc-windows-msvc` | 572,416 bytes | Native Windows x64 stable build; fmt, 5 tests, clippy with warnings denied, release build, and `--no-elevate` runtime TXT/JSON structure check passed |
-| `HowAmI-Linux-x64` | `x86_64-unknown-linux-musl` | 1,251,704 bytes | `rust-lld` static cross-build; target clippy, test-binary link with `cargo test --no-run`, and release build passed; not executed on Linux hardware |
-| `HowAmI-Linux-arm64` | `aarch64-unknown-linux-musl` | 1,254,224 bytes | `rust-lld` static cross-build; target clippy, test-binary link with `cargo test --no-run`, and release build passed; not executed on Linux ARM64 hardware |
+| `HowAmI-Windows-x64.exe` | `x86_64-pc-windows-msvc` | 572,416 bytes | Windows x64 네이티브 build, fmt, 5 tests, clippy, release build, `--no-elevate` 실행 및 TXT/JSON 구조 확인 |
+| `HowAmI-Linux-x64` | `x86_64-unknown-linux-musl` | 1,251,704 bytes | `rust-lld` 정적 크로스빌드, target clippy, `cargo test --no-run`, release link 통과. Linux 실장비 실행은 별도 확인 필요 |
+| `HowAmI-Linux-arm64` | `aarch64-unknown-linux-musl` | 1,254,224 bytes | `rust-lld` 정적 크로스빌드, target clippy, `cargo test --no-run`, release link 통과. Linux ARM64 실장비 실행은 별도 확인 필요 |
 
-The Windows executable is an x86-64 PE32+ console application. The Linux x64 file is a static PIE ELF x86-64 executable, and the Linux arm64 file is a statically linked ELF AArch64 executable. All three files are unsigned.
+## Binary format / 바이너리 형식
 
-Windows 실행 파일은 x86-64 PE32+ 콘솔 프로그램입니다. Linux x64는 static PIE ELF x86-64, Linux arm64는 정적 링크 ELF AArch64 실행 파일입니다. 세 파일 모두 서명되지 않았습니다.
+- `HowAmI-Windows-x64.exe`: x86-64 PE32+ console application
+- `HowAmI-Linux-x64`: static PIE ELF x86-64
+- `HowAmI-Linux-arm64`: statically linked ELF AArch64
 
-## Targets without artifacts / 산출물이 없는 대상
+현재 세 바이너리는 코드 서명되지 않았습니다.
 
-- Windows arm64: target clippy passed, but release linking failed because ARM64 MSVC/CRT libraries were not installed. No executable was produced.
-- macOS x64/arm64: target clippy passed, but this Windows environment has no Apple SDK, Apple linker, or macOS hardware. No executables were produced.
-- Windows arm64: 대상 clippy는 통과했지만 ARM64 MSVC/CRT 라이브러리가 설치되지 않아 release 링크에 실패했습니다. 실행 파일을 만들지 않았습니다.
-- macOS x64/arm64: 대상 clippy는 통과했지만 현재 Windows 환경에는 Apple SDK, Apple 링커, macOS 실장비가 없습니다. 실행 파일을 만들지 않았습니다.
+The three binaries are currently unsigned.
 
-The Linux candidates must be executed on real target hardware before an official Release. Windows arm64 and both macOS targets require native/correctly provisioned build environments and real-device validation.
+## Not included / 미포함 대상
 
-Linux 후보는 공식 Release 전에 각 대상 실장비에서 실행해야 합니다. Windows arm64와 두 macOS 대상은 적절한 빌드 환경과 실장비 검증이 필요합니다.
+- Windows ARM64: ARM64 MSVC/CRT 링크 환경이 없어 실행 파일을 생성하지 않음
+- macOS x64/ARM64: Apple SDK 및 macOS 빌드 환경이 없어 실행 파일을 생성하지 않음
+
+- Windows ARM64: no executable was produced because an ARM64 MSVC/CRT link environment was unavailable
+- macOS x64/ARM64: no executables were produced because an Apple SDK and macOS build environment were unavailable
+
+## Checksums / 체크섬
+
+각 파일의 SHA-256은 같은 디렉터리의 [`SHA256SUMS.txt`](SHA256SUMS.txt)에 기록되어 있습니다.
+
+SHA-256 checksums for all included artifacts are listed in [`SHA256SUMS.txt`](SHA256SUMS.txt).
