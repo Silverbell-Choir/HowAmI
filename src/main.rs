@@ -12,7 +12,7 @@ use model::{ReportMeta, SystemReport};
 use std::{
     env,
     fs::{self, OpenOptions},
-    io::Write,
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 
@@ -151,12 +151,21 @@ fn run_elevated_child(
         return Err("elevated child marker was supplied without Administrator/root privileges".into());
     }
 
-    let metadata = fs::symlink_metadata(handoff)?;
-    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
+    let path_metadata = fs::symlink_metadata(handoff)?;
+    if !path_metadata.file_type().is_file() || path_metadata.file_type().is_symlink() {
         return Err("invalid elevation handoff target".into());
     }
 
-    let marker = fs::read_to_string(handoff)?;
+    // Open once without truncate, authenticate through this exact file handle,
+    // then reuse the same handle for the privileged write. This avoids a
+    // path-replacement race between token validation and truncation.
+    let mut file = OpenOptions::new().read(true).write(true).open(handoff)?;
+    if !file.metadata()?.is_file() {
+        return Err("elevation handoff is not a regular file".into());
+    }
+
+    let mut marker = String::new();
+    file.read_to_string(&mut marker)?;
     if marker != token || !token.starts_with("HOWAMI_HANDOFF_V1:") {
         return Err("elevation handoff authentication failed".into());
     }
@@ -164,7 +173,8 @@ fn run_elevated_child(
     let collection = collect_with_fallback();
     let payload = serde_json::to_vec(&collection)?;
 
-    let mut file = OpenOptions::new().write(true).truncate(true).open(handoff)?;
+    file.set_len(0)?;
+    file.seek(SeekFrom::Start(0))?;
     file.write_all(&payload)?;
     file.sync_all()?;
     Ok(())
