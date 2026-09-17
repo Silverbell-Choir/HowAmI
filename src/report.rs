@@ -11,6 +11,7 @@ pub fn render_text(report: &SystemReport) -> String {
     let _ = writeln!(out);
     let _ = writeln!(out, "Generated At         : {}", report.meta.generated_at);
     let _ = writeln!(out, "Version              : {}", report.meta.app_version);
+    let _ = writeln!(out, "Report Schema        : {}", report.meta.schema_version);
     let _ = writeln!(out, "OS                   : {}", report.meta.os);
     let _ = writeln!(out, "Architecture         : {}", report.meta.architecture);
     let _ = writeln!(
@@ -143,6 +144,7 @@ mod tests {
         cpu.push(DeviceRecord::new("CPU 0").with_field("Model", "Example CPU"));
         SystemReport {
             meta: ReportMeta {
+                schema_version: 1,
                 app_name: "HowAmI".into(),
                 app_version: "0.1.0".into(),
                 generated_at: "2026-01-01T00:00:00+00:00".into(),
@@ -160,6 +162,7 @@ mod tests {
     fn text_report_contains_core_fields() {
         let text = render_text(&sample_report());
         assert!(text.contains("HowAmI"));
+        assert!(text.contains("Report Schema        : 1"));
         assert!(text.contains("Example CPU"));
         assert!(text.contains("Collection Privilege : Administrator / root"));
     }
