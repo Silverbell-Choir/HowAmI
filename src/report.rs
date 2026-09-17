@@ -9,13 +9,13 @@ pub fn render_text(report: &SystemReport) -> String {
     let _ = writeln!(out, "║              Computer Hardware & System Report              ║");
     let _ = writeln!(out, "╚══════════════════════════════════════════════════════════════╝");
     let _ = writeln!(out);
-    let _ = writeln!(out, "Generated At : {}", report.meta.generated_at);
-    let _ = writeln!(out, "Version      : {}", report.meta.app_version);
-    let _ = writeln!(out, "OS           : {}", report.meta.os);
-    let _ = writeln!(out, "Architecture : {}", report.meta.architecture);
+    let _ = writeln!(out, "Generated At         : {}", report.meta.generated_at);
+    let _ = writeln!(out, "Version              : {}", report.meta.app_version);
+    let _ = writeln!(out, "OS                   : {}", report.meta.os);
+    let _ = writeln!(out, "Architecture         : {}", report.meta.architecture);
     let _ = writeln!(
         out,
-        "Privilege    : {}",
+        "Collection Privilege : {}",
         if report.meta.elevated {
             "Administrator / root"
         } else {
@@ -100,6 +100,6 @@ mod tests {
         let text = render_text(&report);
         assert!(text.contains("HowAmI"));
         assert!(text.contains("Example CPU"));
-        assert!(text.contains("Administrator / root"));
+        assert!(text.contains("Collection Privilege : Administrator / root"));
     }
 }
