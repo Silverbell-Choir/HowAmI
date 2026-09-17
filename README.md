@@ -7,6 +7,28 @@ HowAmI는 Windows, macOS, Linux에서 하드웨어·펌웨어·드라이버·운
 
 HowAmI is an open-source Windows, macOS, and Linux utility that **collects system information locally** and writes both human-readable TXT and structured JSON reports.
 
+## 다운로드 / Download
+
+사전 빌드된 실행 파일은 소스 저장소에 직접 포함하지 않고 **GitHub Releases**에서 제공합니다.
+
+Prebuilt binaries are distributed through **GitHub Releases**, not committed directly to the source tree.
+
+- [GitHub Releases](https://github.com/Silverbell-Choir/HowAmI/releases)
+- 원하는 플랫폼의 바이너리가 없는 경우 아래 빌드 안내를 따라 소스에서 직접 빌드할 수 있습니다.
+- If a binary for your platform is not available, you can build HowAmI from source using the instructions below.
+
+권장 배포 파일명 / Recommended artifact names:
+
+```text
+HowAmI-Windows-x64.exe
+HowAmI-Windows-arm64.exe
+HowAmI-macOS-x64
+HowAmI-macOS-arm64
+HowAmI-Linux-x64
+HowAmI-Linux-arm64
+SHA256SUMS.txt
+```
+
 ---
 
 ## 한국어
@@ -91,7 +113,7 @@ HowAmI --no-elevate
 
 자세한 내용: [`docs/PRIVACY.md`](docs/PRIVACY.md)
 
-### 빌드
+### 소스에서 빌드
 
 Rust stable `1.74+`가 필요합니다.
 
@@ -99,25 +121,14 @@ Rust stable `1.74+`가 필요합니다.
 cargo build --release --locked
 ```
 
-산출물:
+기본 산출물:
 
-- Windows: `target/release/HowAmI.exe`
-- macOS/Linux: `target/release/HowAmI`
+```text
+Windows      target/release/HowAmI.exe
+macOS/Linux  target/release/HowAmI
+```
 
 자세한 빌드 방법: [`docs/BUILD.md`](docs/BUILD.md)
-
-### 제공 중인 v0.1.0 바이너리
-
-| 파일 | 대상 | 상태 |
-| --- | --- | --- |
-| [`HowAmI-Windows-x64.exe`](release/dist/v0.1.0/HowAmI-Windows-x64.exe) | Windows x64 | Windows x64에서 빌드 및 기본 실행 확인 |
-| [`HowAmI-Linux-x64`](release/dist/v0.1.0/HowAmI-Linux-x64) | Linux x64 musl | 정적 크로스빌드 완료, 실장비 실행 확인 필요 |
-| [`HowAmI-Linux-arm64`](release/dist/v0.1.0/HowAmI-Linux-arm64) | Linux ARM64 musl | 정적 크로스빌드 완료, 실장비 실행 확인 필요 |
-
-체크섬: [`SHA256SUMS.txt`](release/dist/v0.1.0/SHA256SUMS.txt)  
-빌드 정보: [`BUILD-INFO.md`](release/dist/v0.1.0/BUILD-INFO.md)
-
-Windows ARM64 및 macOS 바이너리는 아직 포함되어 있지 않습니다. 소스는 해당 플랫폼 Collector를 포함하고 있으며, 각 대상 환경에서 직접 빌드할 수 있습니다.
 
 ### 문서
 
@@ -211,7 +222,7 @@ Review reports before sharing them with another person or service.
 
 See [`docs/PRIVACY.md`](docs/PRIVACY.md).
 
-### Build
+### Build from source
 
 Stable Rust `1.74+` is required.
 
@@ -219,25 +230,14 @@ Stable Rust `1.74+` is required.
 cargo build --release --locked
 ```
 
-Artifacts:
+Default build output:
 
-- Windows: `target/release/HowAmI.exe`
-- macOS/Linux: `target/release/HowAmI`
+```text
+Windows      target/release/HowAmI.exe
+macOS/Linux  target/release/HowAmI
+```
 
 See [`docs/BUILD.md`](docs/BUILD.md) for platform-specific instructions.
-
-### Available v0.1.0 binaries
-
-| File | Target | Status |
-| --- | --- | --- |
-| [`HowAmI-Windows-x64.exe`](release/dist/v0.1.0/HowAmI-Windows-x64.exe) | Windows x64 | Built and basic-run checked on Windows x64 |
-| [`HowAmI-Linux-x64`](release/dist/v0.1.0/HowAmI-Linux-x64) | Linux x64 musl | Static cross-build complete; target-hardware run still recommended |
-| [`HowAmI-Linux-arm64`](release/dist/v0.1.0/HowAmI-Linux-arm64) | Linux ARM64 musl | Static cross-build complete; target-hardware run still recommended |
-
-Checksums: [`SHA256SUMS.txt`](release/dist/v0.1.0/SHA256SUMS.txt)  
-Build details: [`BUILD-INFO.md`](release/dist/v0.1.0/BUILD-INFO.md)
-
-Windows ARM64 and macOS binaries are not currently included. Their collectors are present in source and can be built on the corresponding target environments.
 
 ### Documentation
 
