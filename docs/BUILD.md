@@ -4,7 +4,7 @@
 
 ### 요구사항
 
-- Rust stable toolchain (`rustup` 권장)
+- Rust stable `1.74+` toolchain (`rustup` 권장)
 - 대상 OS에서 직접 빌드하는 방식을 기본으로 합니다.
 - GitHub Actions/유료 CI는 사용하지 않습니다.
 
@@ -19,7 +19,21 @@ cargo clippy --all-targets -- -D warnings
 cargo build --release
 ```
 
-`cargo build` 또는 `cargo generate-lockfile`을 처음 실행하면 `Cargo.lock`이 생성됩니다. HowAmI는 애플리케이션이므로 실제 릴리스 빌드를 확정할 때 생성된 `Cargo.lock`도 저장소에 커밋하는 것을 권장합니다.
+동일 절차를 실행하는 보조 스크립트도 제공합니다.
+
+Windows:
+
+```powershell
+.\scripts\validate-windows.ps1
+```
+
+macOS/Linux:
+
+```bash
+sh scripts/validate-unix.sh
+```
+
+`cargo build` 또는 `cargo generate-lockfile`을 처음 실행하면 `Cargo.lock`이 생성됩니다. HowAmI는 애플리케이션이므로 실제 릴리스 빌드를 확정할 때 생성된 `Cargo.lock`도 저장소에 커밋합니다.
 
 ### Windows
 
@@ -100,9 +114,10 @@ Public 전환이나 Release 전에 최소한 다음을 확인합니다.
 3. 드라이버/펌웨어 버전이 OS가 제공하는 값과 일치하는지
 4. 관리자/root 승인과 거부 모두 정상 동작하는지
 5. `--output` 경로가 권한 상승 후에도 유지되는지
-6. 리포트 파일이 macOS/Linux에서 root 소유로 생성되지 않는지
+6. 일반 사용자 실행 시 최종 리포트가 macOS/Linux에서 root 소유로 생성되지 않는지
 7. 예상치 못한 개인정보/고유 식별 정보가 포함되지 않는지
 8. 장치/API 하나가 실패하거나 timeout되어도 나머지 리포트가 생성되는지
+9. TXT의 보조 단위 표기가 원시 JSON 값과 모순되지 않는지
 
 ---
 
@@ -110,7 +125,7 @@ Public 전환이나 Release 전에 최소한 다음을 확인합니다.
 
 ### Requirements
 
-- Stable Rust toolchain (`rustup` recommended)
+- Stable Rust `1.74+` toolchain (`rustup` recommended)
 - Native builds on each target OS are the default workflow.
 - GitHub Actions and paid CI are intentionally not used.
 
@@ -125,7 +140,21 @@ cargo clippy --all-targets -- -D warnings
 cargo build --release
 ```
 
-The first `cargo build` or `cargo generate-lockfile` creates `Cargo.lock`. HowAmI is an application, so the lockfile produced by the validated release toolchain should be committed when the first release build is finalized.
+Helper scripts run the same sequence.
+
+Windows:
+
+```powershell
+.\scripts\validate-windows.ps1
+```
+
+macOS/Linux:
+
+```bash
+sh scripts/validate-unix.sh
+```
+
+The first `cargo build` or `cargo generate-lockfile` creates `Cargo.lock`. HowAmI is an application, so commit the lockfile produced by the validated release toolchain before the first Release.
 
 ### Windows
 
@@ -206,6 +235,7 @@ Before making the repository public or publishing a Release, verify at least:
 3. driver/firmware versions match values exposed by the OS,
 4. both approval and denial of Administrator/root access behave correctly,
 5. `--output` survives the elevation flow,
-6. reports are not created as root-owned files on macOS/Linux,
+6. in the normal user-started flow, final reports are not root-owned on macOS/Linux,
 7. no unexpected personal or unique identifiers appear,
-8. one failed/timed-out device or API does not prevent the remaining report from being produced.
+8. one failed/timed-out device or API does not prevent the remaining report from being produced,
+9. human-readable TXT annotations remain consistent with the raw JSON values.
