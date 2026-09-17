@@ -1,5 +1,6 @@
-mod command;
+#[cfg(target_os = "linux")]
 mod edid;
+mod command;
 mod elevation;
 mod model;
 mod output;
@@ -20,6 +21,7 @@ struct Cli {
     output: Option<PathBuf>,
     no_elevate: bool,
     elevated_handoff: Option<PathBuf>,
+    elevated_token: Option<String>,
 }
 
 fn main() {
@@ -33,7 +35,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = parse_args()?;
 
     if let Some(handoff) = cli.elevated_handoff.as_deref() {
-        return run_elevated_child(handoff);
+        let token = cli
+            .elevated_token
+            .as_deref()
+            .ok_or("internal elevated child token is missing")?;
+        return run_elevated_child(handoff, token);
     }
 
     let mut warnings = Vec::new();
@@ -86,8 +92,8 @@ fn collect_with_fallback() -> platform::Collection {
 }
 
 fn collect_via_elevated_child() -> Result<platform::Collection, Box<dyn std::error::Error>> {
-    let handoff = create_handoff_file()?;
-    let result = elevation::run_elevated_child(&env::current_exe()?, &handoff);
+    let (handoff, token) = create_handoff_file()?;
+    let result = elevation::run_elevated_child(&env::current_exe()?, &handoff, &token);
 
     if let Err(error) = result {
         let _ = fs::remove_file(&handoff);
@@ -104,7 +110,7 @@ fn collect_via_elevated_child() -> Result<platform::Collection, Box<dyn std::err
     Ok(serde_json::from_slice(&bytes)?)
 }
 
-fn create_handoff_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn create_handoff_file() -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
     let temp = env::temp_dir();
     let pid = std::process::id();
     let now = std::time::SystemTime::now()
@@ -112,6 +118,7 @@ fn create_handoff_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
         .as_nanos();
 
     for attempt in 0u32..32 {
+        let token = format!("HOWAMI_HANDOFF_V1:{pid}:{now}:{attempt}");
         let path = temp.join(format!("HowAmI_{pid}_{now}_{attempt}.handoff"));
         let mut options = OpenOptions::new();
         options.create_new(true).write(true);
@@ -124,9 +131,9 @@ fn create_handoff_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
 
         match options.open(&path) {
             Ok(mut file) => {
-                file.write_all(b"")?;
+                file.write_all(token.as_bytes())?;
                 file.sync_all()?;
-                return Ok(path);
+                return Ok((path, token));
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(error.into()),
@@ -136,7 +143,10 @@ fn create_handoff_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Err("could not create a unique elevation handoff file".into())
 }
 
-fn run_elevated_child(handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_elevated_child(
+    handoff: &Path,
+    token: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     if !elevation::is_elevated() {
         return Err("elevated child marker was supplied without Administrator/root privileges".into());
     }
@@ -144,6 +154,11 @@ fn run_elevated_child(handoff: &Path) -> Result<(), Box<dyn std::error::Error>> 
     let metadata = fs::symlink_metadata(handoff)?;
     if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
         return Err("invalid elevation handoff target".into());
+    }
+
+    let marker = fs::read_to_string(handoff)?;
+    if marker != token || !token.starts_with("HOWAMI_HANDOFF_V1:") {
+        return Err("elevation handoff authentication failed".into());
     }
 
     let collection = collect_with_fallback();
@@ -187,10 +202,14 @@ fn parse_args() -> Result<Cli, Box<dyn std::error::Error>> {
             }
             "--no-elevate" => cli.no_elevate = true,
             "--elevated-child" => {
-                let value = args
+                let path = args
                     .next()
                     .ok_or("--elevated-child requires a handoff path")?;
-                cli.elevated_handoff = Some(PathBuf::from(value));
+                let token = args
+                    .next()
+                    .ok_or("--elevated-child requires a handoff token")?;
+                cli.elevated_handoff = Some(PathBuf::from(path));
+                cli.elevated_token = Some(token);
             }
             "-h" | "--help" => {
                 print_help();
@@ -202,6 +221,9 @@ fn parse_args() -> Result<Cli, Box<dyn std::error::Error>> {
 
     if cli.elevated_handoff.is_some() && (cli.output.is_some() || cli.no_elevate) {
         return Err("internal elevated-child mode cannot be combined with user options".into());
+    }
+    if cli.elevated_handoff.is_some() != cli.elevated_token.is_some() {
+        return Err("incomplete internal elevated-child arguments".into());
     }
 
     Ok(cli)
