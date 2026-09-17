@@ -2,11 +2,11 @@
 
 ## 한국어
 
-HowAmI는 현재 **개인 사용자가 자기 컴퓨터를 상세 확인하는 용도**를 우선합니다. 따라서 기본 상세 리포트에는 고유 식별 정보가 포함될 수 있습니다.
+HowAmI는 사용자가 **자기 컴퓨터의 상세 시스템 정보를 확인하는 도구**입니다. 상세 리포트에는 장치와 시스템을 식별할 수 있는 값이 포함될 수 있습니다.
 
-현재 포함될 수 있는 값:
+### 포함될 수 있는 정보
 
-- 메인보드/시스템/BIOS 관련 시리얼 및 UUID
+- 메인보드/시스템/BIOS 시리얼 및 UUID
 - RAM/스토리지/모니터/USB 장치 시리얼 번호
 - MAC 주소
 - 컴퓨터 호스트명
@@ -14,34 +14,43 @@ HowAmI는 현재 **개인 사용자가 자기 컴퓨터를 상세 확인하는 �
 - 볼륨/파일시스템 UUID
 - 입력 장치 Unique ID
 - 드라이버/INF 식별 정보
-- Linux/macOS 시스템 도구가 반환하는 기타 장치 식별자
+- 운영체제와 시스템 도구가 제공하는 기타 장치 식별자
 
-HowAmI 코드에는 리포트 업로드, 원격 분석, 텔레메트리 기능을 넣지 않습니다. 생성 결과는 사용자가 지정한 로컬 경로 또는 기본 Desktop 경로에 저장됩니다.
+### 데이터 처리 방식
 
-### 관리자/root 권한과 파일 소유권
+- 수집은 로컬 컴퓨터에서 수행됩니다.
+- HowAmI에는 리포트 업로드, 원격 분석, 텔레메트리 기능이 없습니다.
+- 생성된 TXT/JSON은 기본적으로 Desktop 또는 `--output`으로 지정한 로컬 경로에 저장됩니다.
+- HowAmI는 수집 결과를 외부 서버로 전송하지 않습니다.
 
-일반 사용자로 실행한 경우 최종 TXT/JSON 파일은 일반 사용자 부모 프로세스가 생성합니다. 관리자/root child는 수집 결과만 임시 handoff 파일로 반환하고 종료합니다. 따라서 macOS/Linux에서 최종 리포트가 의도치 않게 root 소유가 되는 것을 피하도록 설계되어 있습니다.
+### 관리자/root 권한
 
-### 공개 전 필수 검증
+일반 사용자로 시작한 경우 관리자/root child는 필요한 시스템 정보 수집만 수행하고 종료합니다. 최종 TXT/JSON은 일반적인 실행 흐름에서 원래 사용자 프로세스가 작성합니다.
 
-저장소를 Public으로 전환하기 전에 Windows/macOS/Linux 실제 장비에서 생성된 TXT/JSON을 검토하여 다음을 확정합니다.
+### 리포트 공유 시 주의
 
-1. 기본 상세 리포트에 실제로 어떤 고유 식별 정보가 들어가는지
-2. 사용자 계정명이나 홈 디렉터리 경로가 의도치 않게 출력되는지
-3. Linux의 `lspci`/`lsusb`/`dmidecode`, macOS 시스템 도구 등 Raw/flattened 출력에 예상하지 못한 개인정보가 포함되는지
-4. 볼륨/파일시스템 UUID, 입력 장치 Unique ID 등 일반 사용자가 개인정보로 인식하지 못할 수 있는 식별자가 어떻게 표시되는지
-5. README의 개인정보 안내가 실제 출력과 일치하는지
-6. 향후 공유용 `--safe-share` 모드가 필요한지
+HowAmI 리포트는 개인 확인용 상세 정보를 포함할 수 있으므로, 다른 사람·커뮤니티·지원 서비스·AI 서비스 등에 공유하기 전에 내용을 직접 확인하세요.
 
-현재 목적은 **개인용 상세 확인**이므로 식별 정보를 자동으로 숨기지 않습니다. 외부 공유 전에는 반드시 사용자가 리포트 내용을 직접 확인해야 합니다.
+특히 다음 값은 장치나 시스템을 장기간 식별하는 데 사용될 수 있습니다.
+
+```text
+Serial Number
+UUID
+MAC Address
+Host Name
+Device / Instance ID
+Filesystem / Volume UUID
+```
+
+필요한 항목만 전달하거나 민감하다고 판단한 값을 직접 제거한 뒤 공유하는 것을 권장합니다.
 
 ---
 
 ## English
 
-HowAmI currently prioritizes **detailed personal inspection of the user's own computer**. The default detailed report can therefore contain unique identifiers.
+HowAmI is designed for **detailed inspection of the user's own computer**. Reports can contain values that identify specific hardware or a specific system installation.
 
-Values that may appear include:
+### Information that may appear
 
 - motherboard/system/BIOS serials and UUIDs
 - RAM/storage/monitor/USB serial numbers
@@ -51,23 +60,32 @@ Values that may appear include:
 - volume/filesystem UUIDs
 - input-device unique IDs
 - driver/INF identifiers
-- other identifiers returned by Linux/macOS system tools
+- other device identifiers exposed by the operating system and system tools
 
-HowAmI does not implement report upload, remote analysis, or telemetry. Reports are written only to the user-selected local directory or the default Desktop location.
+### Data handling
 
-### Administrator/root access and file ownership
+- Collection is performed locally on the computer.
+- HowAmI does not implement report upload, remote analysis, or telemetry.
+- TXT/JSON reports are written to the Desktop by default or to a local path selected with `--output`.
+- HowAmI does not transmit collected report data to an external server.
 
-When started by a normal user, the final TXT/JSON files are created by the normal user parent process. The Administrator/root child returns collection data through a temporary handoff file and exits. This is designed to avoid unintentionally creating final reports owned by root on macOS/Linux.
+### Administrator/root access
 
-### Required review before making the repository public
+When started by a normal user, the Administrator/root child performs only the collection that requires additional privileges and then exits. In the normal execution flow, the original user process writes the final TXT/JSON reports.
 
-Before switching the repository to Public, inspect real TXT/JSON reports from Windows, macOS, and Linux hardware and determine:
+### Before sharing a report
 
-1. exactly which unique identifiers appear in the default detailed report,
-2. whether account names or home-directory paths are exposed unintentionally,
-3. whether raw/flattened output from tools such as Linux `lspci`/`lsusb`/`dmidecode` or macOS system tools contains unexpected personal data,
-4. how identifiers such as volume/filesystem UUIDs and input-device unique IDs are presented,
-5. whether README privacy guidance matches actual output,
-6. whether a future `--safe-share` profile is desirable.
+A HowAmI report can contain detailed identifiers intended for personal inspection. Review it before sharing it with another person, a community, a support service, or an AI service.
 
-The current goal is **detailed personal inspection**, so identifiers are not automatically redacted. Users should review the report before sharing it externally.
+The following values can be especially useful for identifying a device or installation over time:
+
+```text
+Serial Number
+UUID
+MAC Address
+Host Name
+Device / Instance ID
+Filesystem / Volume UUID
+```
+
+Share only the information you need, and remove any values you consider sensitive before sending the report elsewhere.
