@@ -97,7 +97,12 @@ fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
 
 #[cfg(target_os = "macos")]
 fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
-    let command = format!("{} --elevated", shell_single_quote(&exe.to_string_lossy()));
+    let home = env::var("HOME").unwrap_or_else(|_| "/Users/Shared".into());
+    let command = format!(
+        "HOME={} {} --elevated",
+        shell_single_quote(&home),
+        shell_single_quote(&exe.to_string_lossy())
+    );
     let script = format!(
         "do shell script \"{}\" with administrator privileges",
         applescript_double_quote(&command)
@@ -108,13 +113,26 @@ fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
 
 #[cfg(target_os = "linux")]
 fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
+    let home = env::var("HOME").unwrap_or_else(|_| "/root".into());
+    let home_arg = format!("HOME={home}");
+
     if command_exists("pkexec") {
-        let status = Command::new("pkexec").arg(exe).arg("--elevated").status()?;
+        let status = Command::new("pkexec")
+            .arg("/usr/bin/env")
+            .arg(&home_arg)
+            .arg(exe)
+            .arg("--elevated")
+            .status()?;
         return Ok(status.success());
     }
 
     if command_exists("sudo") {
-        let status = Command::new("sudo").arg(exe).arg("--elevated").status()?;
+        let status = Command::new("sudo")
+            .arg("/usr/bin/env")
+            .arg(&home_arg)
+            .arg(exe)
+            .arg("--elevated")
+            .status()?;
         return Ok(status.success());
     }
 
