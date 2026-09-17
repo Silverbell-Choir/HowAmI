@@ -10,7 +10,7 @@ HowAmI는 하드웨어 정보를 최대한 읽기 위해 관리자/root 권한�
 - 일반 사용자로 실행하면 최종 TXT/JSON 저장은 일반 사용자 프로세스가 수행합니다.
 - 관리자/root child는 시스템 정보 수집과 handoff 작성만 수행하고 종료합니다.
 - elevated 상태에서 임의 PATH 검색을 사용하지 않습니다.
-- Windows PowerShell은 `%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`를 사용합니다.
+- Windows PowerShell은 Windows 시스템 디렉터리를 API로 확인한 뒤 그 아래 `WindowsPowerShell\\v1.0\\powershell.exe`를 사용합니다.
 - macOS 시스템 도구는 고정된 `/usr/bin` 또는 `/usr/sbin` 경로를 사용합니다.
 - Linux 보조 도구는 `/usr/bin`, `/bin`, `/usr/sbin`, `/sbin`에서만 찾습니다.
 - 수집용 외부 명령에는 timeout을 적용합니다.
@@ -18,7 +18,19 @@ HowAmI는 하드웨어 정보를 최대한 읽기 위해 관리자/root 권한�
 
 ### 임시 handoff 파일
 
-부모 프로세스가 먼저 임시 파일을 생성하고, Unix 계열에서는 `0600` 권한으로 제한합니다. elevated child는 이미 존재하는 일반 파일만 열어 수집 JSON을 기록합니다. symbolic link는 거부합니다. 부모 프로세스는 내용을 읽은 뒤 handoff 파일을 삭제합니다.
+부모 프로세스가 먼저 고유한 임시 handoff 파일을 `create_new`로 생성하고, Unix 계열에서는 `0600` 권한으로 제한합니다. 파일에는 이번 권한 상승 흐름에 대응하는 handoff token을 먼저 기록합니다.
+
+elevated child는 다음을 모두 확인한 뒤에만 파일을 덮어씁니다.
+
+1. 실제 관리자/root 권한인지 확인
+2. 전달된 경로가 이미 존재하는 일반 파일인지 확인
+3. symbolic link가 아닌지 확인
+4. 파일의 기존 token과 인자로 받은 token이 정확히 일치하는지 확인
+5. HowAmI handoff marker 형식인지 확인
+
+검증이 끝난 뒤에만 수집 JSON을 기록합니다. 부모 프로세스는 결과를 읽은 후 handoff 파일을 삭제합니다.
+
+이 token은 암호학적 비밀키를 목적으로 하는 것이 아니라, 임의로 숨겨진 내부 인자만 호출하여 elevated HowAmI가 무관한 파일을 truncate하는 것을 방지하기 위한 handoff 인증 표식입니다.
 
 ### 보안 취약점 제보
 
@@ -36,7 +48,7 @@ HowAmI may use Administrator/root privileges to obtain detailed hardware informa
 - When started by a normal user, final TXT/JSON output is written by the normal user process.
 - The Administrator/root child performs collection and handoff writing only, then exits.
 - Elevated code does not use arbitrary PATH-based executable discovery.
-- Windows PowerShell is launched from `%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`.
+- On Windows, the system directory is resolved through the Windows API and PowerShell is launched from its `WindowsPowerShell\\v1.0\\powershell.exe` child path.
 - macOS system tools use fixed `/usr/bin` or `/usr/sbin` locations.
 - Linux helper tools are discovered only under `/usr/bin`, `/bin`, `/usr/sbin`, and `/sbin`.
 - Collector subprocesses have timeouts.
@@ -44,7 +56,19 @@ HowAmI may use Administrator/root privileges to obtain detailed hardware informa
 
 ### Temporary handoff file
 
-The parent creates the handoff file before elevation and restricts it to mode `0600` on Unix-like systems. The elevated child opens only an already-existing regular file and rejects symbolic links. The parent reads the collection JSON and removes the handoff file afterward.
+The parent creates a unique handoff file with `create_new` before elevation and restricts it to mode `0600` on Unix-like systems. It first writes a handoff token associated with that elevation flow.
+
+Before overwriting the file, the elevated child verifies all of the following:
+
+1. it is actually running with Administrator/root privileges,
+2. the supplied path already refers to a regular file,
+3. the path is not a symbolic link,
+4. the token already stored in the file exactly matches the token supplied to the child,
+5. the value uses the expected HowAmI handoff marker format.
+
+Only then is collection JSON written. The parent reads the result and removes the handoff file afterward.
+
+The token is not intended to be a cryptographic secret. Its purpose is to prevent someone from invoking only the hidden internal argument and causing an elevated HowAmI process to truncate an unrelated file.
 
 ### Reporting a security issue
 
