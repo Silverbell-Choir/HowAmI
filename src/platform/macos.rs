@@ -1,32 +1,14 @@
 use super::Collection;
-use crate::model::{DeviceRecord, Section};
+use crate::{
+    command,
+    model::{DeviceRecord, Section},
+};
 use serde_json::Value;
-use std::{collections::BTreeMap, process::Command};
+use std::{collections::BTreeMap, process::Command, time::Duration};
 
 pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     let mut collection = Collection::default();
-
-    let mut os_section = Section::new("System");
-    if let Ok(output) = Command::new("sw_vers").output() {
-        if output.status.success() {
-            let mut record = DeviceRecord::new("macOS");
-            for line in String::from_utf8_lossy(&output.stdout).lines() {
-                if let Some((key, value)) = line.split_once(':') {
-                    record.insert(key.trim(), value.trim());
-                }
-            }
-            os_section.push(record);
-        }
-    }
-    if let Ok(output) = Command::new("uname").args(["-a"]).output() {
-        if output.status.success() {
-            os_section.push(
-                DeviceRecord::new("Kernel")
-                    .with_field("uname", String::from_utf8_lossy(&output.stdout).trim()),
-            );
-        }
-    }
-    collection.sections.push(os_section);
+    collection.sections.push(collect_system(&mut collection.warnings));
 
     let data_types = [
         "SPHardwareDataType",
@@ -44,40 +26,124 @@ pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
         "SPExtensionsDataType",
     ];
 
-    let output = Command::new("system_profiler")
-        .args(data_types)
-        .args(["-json", "-detailLevel", "full"])
-        .output()?;
-
-    if output.status.success() {
-        let value: Value = serde_json::from_slice(&output.stdout)?;
-        if let Some(object) = value.as_object() {
-            for (key, value) in object {
-                let mut section = Section::new(friendly_section_name(key));
-                append_top_level_records(value, &mut section);
-                collection.sections.push(section);
+    let profiler = command::macos_program("system_profiler");
+    if let Some(profiler) = profiler {
+        for data_type in data_types {
+            match collect_profiler_type(&profiler, data_type) {
+                Ok(section) => collection.sections.push(section),
+                Err(error) => collection.warnings.push(format!(
+                    "system_profiler {data_type} failed: {error}"
+                )),
             }
         }
     } else {
-        collection.warnings.push(format!(
-            "system_profiler failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        collection
+            .warnings
+            .push("trusted /usr/sbin/system_profiler was not found".into());
     }
 
-    if let Ok(output) = Command::new("systemextensionsctl").arg("list").output() {
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !text.is_empty() {
-                collection.sections.push(Section {
-                    name: "System Extensions".into(),
-                    records: vec![DeviceRecord::new("systemextensionsctl").with_field("Raw", text)],
-                });
+    if let Some(tool) = command::macos_program("systemextensionsctl") {
+        let mut process = Command::new(tool);
+        process.arg("list");
+        match command::run_capture(&mut process, Duration::from_secs(20)) {
+            Ok(output) if output.timed_out => collection
+                .warnings
+                .push("systemextensionsctl timed out after 20 seconds".into()),
+            Ok(output) if output.status.success() => {
+                let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !text.is_empty() {
+                    collection.sections.push(Section {
+                        name: "System Extensions".into(),
+                        records: vec![
+                            DeviceRecord::new("systemextensionsctl").with_field("Raw", text),
+                        ],
+                    });
+                }
             }
+            Ok(output) => collection.warnings.push(format!(
+                "systemextensionsctl failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )),
+            Err(error) => collection
+                .warnings
+                .push(format!("systemextensionsctl could not run: {error}")),
         }
     }
 
     Ok(collection)
+}
+
+fn collect_system(warnings: &mut Vec<String>) -> Section {
+    let mut section = Section::new("System");
+
+    if let Some(sw_vers) = command::macos_program("sw_vers") {
+        let mut process = Command::new(sw_vers);
+        match command::run_capture(&mut process, Duration::from_secs(10)) {
+            Ok(output) if output.success() => {
+                let mut record = DeviceRecord::new("macOS");
+                for line in String::from_utf8_lossy(&output.stdout).lines() {
+                    if let Some((key, value)) = line.split_once(':') {
+                        record.insert(key.trim(), value.trim());
+                    }
+                }
+                section.push(record);
+            }
+            Ok(output) if output.timed_out => {
+                warnings.push("sw_vers timed out after 10 seconds".into())
+            }
+            Ok(output) => warnings.push(format!(
+                "sw_vers failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )),
+            Err(error) => warnings.push(format!("sw_vers could not run: {error}")),
+        }
+    }
+
+    if let Some(uname) = command::macos_program("uname") {
+        let mut process = Command::new(uname);
+        process.args(["-a"]);
+        match command::run_capture(&mut process, Duration::from_secs(10)) {
+            Ok(output) if output.success() => section.push(
+                DeviceRecord::new("Kernel")
+                    .with_field("uname", String::from_utf8_lossy(&output.stdout).trim()),
+            ),
+            Ok(output) if output.timed_out => {
+                warnings.push("uname timed out after 10 seconds".into())
+            }
+            Ok(output) => warnings.push(format!(
+                "uname failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )),
+            Err(error) => warnings.push(format!("uname could not run: {error}")),
+        }
+    }
+
+    section
+}
+
+fn collect_profiler_type(
+    profiler: &std::path::Path,
+    data_type: &str,
+) -> Result<Section, Box<dyn std::error::Error>> {
+    let mut process = Command::new(profiler);
+    process.args([data_type, "-json", "-detailLevel", "full"]);
+    let output = command::run_capture(&mut process, Duration::from_secs(45))?;
+
+    if output.timed_out {
+        return Err("timed out after 45 seconds".into());
+    }
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr)
+            .trim()
+            .to_string()
+            .into());
+    }
+
+    let value: Value = serde_json::from_slice(&output.stdout)?;
+    let payload = value.get(data_type).unwrap_or(&value);
+    let mut section = Section::new(friendly_section_name(data_type));
+    append_top_level_records(payload, &mut section);
+    Ok(section)
 }
 
 fn append_top_level_records(value: &Value, section: &mut Section) {
@@ -110,13 +176,17 @@ fn flatten_json(prefix: &str, value: &Value, fields: &mut BTreeMap<String, Strin
     match value {
         Value::Null => {}
         Value::Bool(v) => {
-            fields.insert(prefix.to_string(), v.to_string());
+            if !prefix.is_empty() {
+                fields.insert(prefix.to_string(), v.to_string());
+            }
         }
         Value::Number(v) => {
-            fields.insert(prefix.to_string(), v.to_string());
+            if !prefix.is_empty() {
+                fields.insert(prefix.to_string(), v.to_string());
+            }
         }
         Value::String(v) => {
-            if !v.trim().is_empty() {
+            if !prefix.is_empty() && !v.trim().is_empty() {
                 fields.insert(prefix.to_string(), v.clone());
             }
         }
@@ -132,7 +202,7 @@ fn flatten_json(prefix: &str, value: &Value, fields: &mut BTreeMap<String, Strin
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
-                if !joined.is_empty() {
+                if !prefix.is_empty() && !joined.is_empty() {
                     fields.insert(prefix.to_string(), joined);
                 }
             } else {
