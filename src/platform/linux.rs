@@ -1,6 +1,6 @@
 use super::Collection;
 use crate::{
-    edid,
+    command, edid,
     model::{DeviceRecord, Section},
 };
 use serde_json::Value;
@@ -8,12 +8,13 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    time::Duration,
 };
 
 pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     let mut collection = Collection::default();
 
-    collection.sections.push(collect_system());
+    collection.sections.push(collect_system(&mut collection.warnings));
     collection.sections.push(collect_cpu());
     collection.sections.push(collect_dmi());
     collection.sections.push(collect_memory());
@@ -30,20 +31,26 @@ pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     collection.sections.push(collect_network());
     collection.sections.push(collect_displays());
 
-    if let Some(section) = collect_optional_command("PCI Devices (lspci)", "lspci", &["-nnk"]) {
-        collection.sections.push(section);
+    match collect_optional_command("PCI Devices (lspci)", "lspci", &["-nnk"], 30) {
+        Ok(Some(section)) => collection.sections.push(section),
+        Ok(None) => {}
+        Err(error) => collection.warnings.push(error),
     }
-    if let Some(section) = collect_optional_command("USB Devices (lsusb)", "lsusb", &["-v"]) {
-        collection.sections.push(section);
+    match collect_optional_command("USB Devices (lsusb)", "lsusb", &["-v"], 30) {
+        Ok(Some(section)) => collection.sections.push(section),
+        Ok(None) => {}
+        Err(error) => collection.warnings.push(error),
     }
-    if let Some(section) = collect_dmidecode_memory() {
-        collection.sections.push(section);
+    match collect_dmidecode_memory() {
+        Ok(Some(section)) => collection.sections.push(section),
+        Ok(None) => {}
+        Err(error) => collection.warnings.push(error),
     }
 
     Ok(collection)
 }
 
-fn collect_system() -> Section {
+fn collect_system(warnings: &mut Vec<String>) -> Section {
     let mut section = Section::new("System");
     let mut os = DeviceRecord::new("Linux");
 
@@ -58,13 +65,29 @@ fn collect_system() -> Section {
         }
     }
 
-    if let Ok(output) = Command::new("uname").args(["-srmo"]).output() {
-        if output.status.success() {
-            os.insert("Kernel", String::from_utf8_lossy(&output.stdout).trim());
+    if let Some(uname) = command::linux_program("uname") {
+        let mut process = Command::new(uname);
+        process.args(["-srmo"]);
+        match command::run_capture(&mut process, Duration::from_secs(10)) {
+            Ok(output) if output.success() => {
+                os.insert("Kernel", String::from_utf8_lossy(&output.stdout).trim())
+            }
+            Ok(output) if output.timed_out => {
+                warnings.push("uname timed out after 10 seconds".into())
+            }
+            Ok(output) => warnings.push(format!(
+                "uname failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )),
+            Err(error) => warnings.push(format!("uname could not run: {error}")),
         }
     }
+
     if let Ok(hostname) = fs::read_to_string("/etc/hostname") {
         os.insert("Hostname", hostname.trim());
+    }
+    if let Ok(version) = fs::read_to_string("/proc/version") {
+        os.insert("KernelBuild", version.trim());
     }
 
     section.push(os);
@@ -77,7 +100,10 @@ fn collect_cpu() -> Section {
     let blocks: Vec<&str> = text.split("\n\n").filter(|b| !b.trim().is_empty()).collect();
 
     let mut summary = DeviceRecord::new("CPU Summary");
-    summary.insert("LogicalProcessors", blocks.len().to_string());
+    let logical = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(blocks.len());
+    summary.insert("LogicalProcessors", logical.to_string());
 
     if let Some(first) = blocks.first() {
         for line in first.lines() {
@@ -113,6 +139,9 @@ fn collect_dmi() -> Section {
         ("BoardName", "board_name"),
         ("BoardVersion", "board_version"),
         ("BoardSerial", "board_serial"),
+        ("ChassisVendor", "chassis_vendor"),
+        ("ChassisType", "chassis_type"),
+        ("ChassisSerial", "chassis_serial"),
         ("BIOSVendor", "bios_vendor"),
         ("BIOSVersion", "bios_version"),
         ("BIOSDate", "bios_date"),
@@ -148,11 +177,15 @@ fn collect_memory() -> Section {
 }
 
 fn collect_lsblk() -> Result<Section, Box<dyn std::error::Error>> {
+    let lsblk = command::linux_program("lsblk").ok_or("lsblk was not found in trusted paths")?;
     let columns = "NAME,KNAME,TYPE,SIZE,MODEL,VENDOR,SERIAL,REV,TRAN,ROTA,FSTYPE,FSVER,LABEL,UUID,MOUNTPOINT";
-    let output = Command::new("lsblk")
-        .args(["-J", "-b", "-o", columns])
-        .output()?;
+    let mut process = Command::new(lsblk);
+    process.args(["-J", "-b", "-o", columns]);
+    let output = command::run_capture(&mut process, Duration::from_secs(20))?;
 
+    if output.timed_out {
+        return Err("lsblk timed out after 20 seconds".into());
+    }
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr)
             .trim()
@@ -254,7 +287,7 @@ fn collect_usb_sysfs() -> Section {
         }
         let product = read_trimmed(path.join("product"));
         let fallback = entry.file_name().to_string_lossy().to_string();
-        let mut record = DeviceRecord::new(product.clone().unwrap_or(fallback));
+        let mut record = DeviceRecord::new(product.unwrap_or(fallback));
         let fields = [
             "manufacturer",
             "product",
@@ -347,28 +380,62 @@ fn collect_displays() -> Section {
     section
 }
 
-fn collect_optional_command(name: &str, command: &str, args: &[&str]) -> Option<Section> {
-    let output = Command::new(command).args(args).output().ok()?;
-    if !output.status.success() {
-        return None;
+fn collect_optional_command(
+    section_name: &str,
+    command_name: &str,
+    args: &[&str],
+    timeout_seconds: u64,
+) -> Result<Option<Section>, String> {
+    let Some(program) = command::linux_program(command_name) else {
+        return Ok(None);
+    };
+
+    let mut process = Command::new(program);
+    process.args(args);
+    let output = command::run_capture(&mut process, Duration::from_secs(timeout_seconds))
+        .map_err(|error| format!("{command_name} could not run: {error}"))?;
+
+    if output.timed_out {
+        return Err(format!(
+            "{command_name} timed out after {timeout_seconds} seconds"
+        ));
     }
+    if !output.status.success() {
+        return Err(format!(
+            "{command_name} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
     let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if text.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(Section {
-        name: name.into(),
-        records: vec![DeviceRecord::new(command).with_field("Raw", text)],
-    })
+
+    Ok(Some(Section {
+        name: section_name.into(),
+        records: vec![DeviceRecord::new(command_name).with_field("Raw", text)],
+    }))
 }
 
-fn collect_dmidecode_memory() -> Option<Section> {
-    let output = Command::new("dmidecode")
-        .args(["--type", "memory"])
-        .output()
-        .ok()?;
+fn collect_dmidecode_memory() -> Result<Option<Section>, String> {
+    let Some(dmidecode) = command::linux_program("dmidecode") else {
+        return Ok(None);
+    };
+
+    let mut process = Command::new(dmidecode);
+    process.args(["--type", "memory"]);
+    let output = command::run_capture(&mut process, Duration::from_secs(20))
+        .map_err(|error| format!("dmidecode could not run: {error}"))?;
+
+    if output.timed_out {
+        return Err("dmidecode timed out after 20 seconds".into());
+    }
     if !output.status.success() {
-        return None;
+        return Err(format!(
+            "dmidecode failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
 
     let text = String::from_utf8_lossy(&output.stdout);
@@ -395,7 +462,7 @@ fn collect_dmidecode_memory() -> Option<Section> {
         }
     }
 
-    Some(section)
+    Ok((!section.records.is_empty()).then_some(section))
 }
 
 fn read_trimmed(path: PathBuf) -> Option<String> {
