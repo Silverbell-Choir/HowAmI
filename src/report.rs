@@ -64,7 +64,8 @@ pub fn render_text(report: &SystemReport) -> String {
                 .min(36);
 
             for (key, value) in &record.fields {
-                let _ = writeln!(out, "{key:width$} : {value}", width = width);
+                let display = display_value(&section.name, key, value);
+                let _ = writeln!(out, "{key:width$} : {display}", width = width);
             }
         }
     }
@@ -74,16 +75,73 @@ pub fn render_text(report: &SystemReport) -> String {
     out
 }
 
+fn display_value(section: &str, key: &str, value: &str) -> String {
+    if is_byte_field(section, key) {
+        if let Ok(bytes) = value.trim().parse::<u64>() {
+            return format!("{value} ({})", format_bytes(bytes));
+        }
+    }
+
+    if key == "SpeedBitsPerSecond" {
+        if let Ok(bits_per_second) = value.trim().parse::<u64>() {
+            return format!(
+                "{value} ({})",
+                format_bits_per_second(bits_per_second)
+            );
+        }
+    }
+
+    value.to_string()
+}
+
+fn is_byte_field(section: &str, key: &str) -> bool {
+    key.ends_with("Bytes")
+        || key == "VRAMBytes"
+        || (section == "Storage" && key.eq_ignore_ascii_case("size"))
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KIB: f64 = 1024.0;
+    const MIB: f64 = KIB * 1024.0;
+    const GIB: f64 = MIB * 1024.0;
+    const TIB: f64 = GIB * 1024.0;
+    let value = bytes as f64;
+
+    if value >= TIB {
+        format!("{:.2} TiB", value / TIB)
+    } else if value >= GIB {
+        format!("{:.2} GiB", value / GIB)
+    } else if value >= MIB {
+        format!("{:.2} MiB", value / MIB)
+    } else if value >= KIB {
+        format!("{:.2} KiB", value / KIB)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+fn format_bits_per_second(bits: u64) -> String {
+    let value = bits as f64;
+    if value >= 1_000_000_000.0 {
+        format!("{:.2} Gbit/s", value / 1_000_000_000.0)
+    } else if value >= 1_000_000.0 {
+        format!("{:.2} Mbit/s", value / 1_000_000.0)
+    } else if value >= 1_000.0 {
+        format!("{:.2} kbit/s", value / 1_000.0)
+    } else {
+        format!("{bits} bit/s")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{DeviceRecord, ReportMeta, Section, SystemReport};
 
-    #[test]
-    fn text_report_contains_core_fields() {
+    fn sample_report() -> SystemReport {
         let mut cpu = Section::new("CPU");
         cpu.push(DeviceRecord::new("CPU 0").with_field("Model", "Example CPU"));
-        let report = SystemReport {
+        SystemReport {
             meta: ReportMeta {
                 app_name: "HowAmI".into(),
                 app_version: "0.1.0".into(),
@@ -95,11 +153,34 @@ mod tests {
             },
             sections: vec![cpu],
             warnings: vec![],
-        };
+        }
+    }
 
-        let text = render_text(&report);
+    #[test]
+    fn text_report_contains_core_fields() {
+        let text = render_text(&sample_report());
         assert!(text.contains("HowAmI"));
         assert!(text.contains("Example CPU"));
         assert!(text.contains("Collection Privilege : Administrator / root"));
+    }
+
+    #[test]
+    fn formats_byte_counts_for_people() {
+        assert_eq!(
+            display_value("GPU Memory (Registry)", "VRAMBytes", "8589934592"),
+            "8589934592 (8.00 GiB)"
+        );
+        assert_eq!(
+            display_value("Storage", "size", "1099511627776"),
+            "1099511627776 (1.00 TiB)"
+        );
+    }
+
+    #[test]
+    fn formats_network_bit_rate() {
+        assert_eq!(
+            display_value("Network Adapters", "SpeedBitsPerSecond", "1000000000"),
+            "1000000000 (1.00 Gbit/s)"
+        );
     }
 }
