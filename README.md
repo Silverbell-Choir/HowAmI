@@ -1,152 +1,237 @@
 # HowAmI
 
-> **One click. One report. Everything your computer can expose.**
->
+> **One click. One report. Everything your computer can expose.**  
 > **한 번 실행. 하나의 리포트. 컴퓨터가 제공할 수 있는 시스템 정보를 최대한 한곳에.**
 
-HowAmI는 Windows, macOS, Linux에서 하드웨어·펌웨어·드라이버·운영체제 정보를 수집해 사람이 읽기 쉬운 TXT와 구조화된 JSON 리포트로 저장하는 오픈소스 도구입니다.
+HowAmI는 Windows, macOS, Linux에서 하드웨어·펌웨어·드라이버·운영체제 정보를 로컬로 수집하고, 사람이 읽기 쉬운 TXT와 구조화된 JSON 리포트로 저장하는 오픈소스 도구입니다.
 
-HowAmI is an open-source Windows, macOS, and Linux utility that collects hardware, firmware, driver, and operating-system information and writes both a human-readable TXT report and a structured JSON report.
+HowAmI is an open-source Windows, macOS, and Linux utility that locally collects hardware, firmware, driver, and operating-system information and writes both a human-readable TXT report and structured JSON.
 
-> **Development status / 개발 상태:** early development (`v0.1.x`). The repository is currently private while report contents are reviewed for privacy and identifier exposure. / 현재 초기 개발 단계이며, 생성 리포트에 포함되는 개인정보·고유 식별 정보 검토가 끝날 때까지 저장소를 비공개로 유지합니다.
+> **Development status / 개발 상태:** `v0.1.x`. The repository remains private until real-device output is reviewed for privacy and identifier exposure. / 실제 장비 출력의 개인정보·고유 식별 정보 검토가 끝날 때까지 저장소를 비공개로 유지합니다.
+
+---
 
 ## 한국어
 
-### 목표
+### 목적
 
-- 실행 한 번으로 가능한 많은 시스템 정보를 수집합니다.
-- Windows는 관리자 권한, macOS/Linux는 가능한 경우 관리자/root 권한을 요청합니다.
-- 수집 결과는 기본적으로 바탕화면에 `HowAmI_Report_*.txt`와 `HowAmI_Report_*.json`으로 생성합니다.
-- HowAmI 자체에는 서버 업로드 기능이나 원격 전송 기능을 구현하지 않습니다.
-- OS/펌웨어/장치가 제공하지 않는 정보는 추측하지 않습니다.
+- 실행 한 번으로 OS와 장치가 노출하는 시스템 정보를 최대한 수집합니다.
+- 값이 없거나 확인할 수 없으면 추측하지 않습니다.
+- 결과는 기본적으로 사용자의 Desktop에 `HowAmI_Report_*.txt`와 `HowAmI_Report_*.json`으로 생성합니다.
+- HowAmI에는 서버 업로드, 원격 분석, 텔레메트리 기능을 구현하지 않습니다.
+- 관리자/root 권한이 필요한 수집은 별도 elevated child에서만 수행하고 최종 리포트는 일반 사용자 프로세스가 작성합니다.
 
 ### 현재 수집 범위
 
 **Windows**
 
-- OS / 시스템 모델
-- CPU, GPU
+- Windows 버전/빌드/시스템 모델
+- CPU, GPU, GPU 드라이버, 현재 해상도/주사율
+- GPU VRAM 보조 조회(Windows 레지스트리가 제공하는 경우)
 - 메인보드, BIOS/UEFI
-- RAM 모듈
-- 디스크, 볼륨, 펌웨어/상태(운영체제가 제공하는 범위)
-- 모니터 및 WMI EDID 정보
+- RAM 모듈/속도/파트넘버/시리얼
+- 디스크/물리 디스크/볼륨/펌웨어/상태
+- 모니터 및 WMI EDID
 - 네트워크, 오디오, USB, Bluetooth, 배터리
 - 현재 연결된 PnP 장치
-- 서명된 PnP 드라이버와 드라이버 버전
-- TPM / Secure Boot 정보(조회 가능한 경우)
+- PnP 드라이버 버전/INF/서명 정보
+- TPM / Secure Boot
 
 **macOS**
 
-- `system_profiler`가 제공하는 Hardware, Display/GPU, Memory, Storage/NVMe, Audio, USB, Network, Bluetooth, Power, PCI, Thunderbolt/USB4, Extension 정보
-- macOS 버전과 커널 정보
-- System Extension 목록(조회 가능한 경우)
+- macOS 버전과 커널
+- `system_profiler`의 Hardware, Display/GPU, Memory, Storage/NVMe, Audio, USB, Network, Bluetooth, Power, PCI, Thunderbolt/USB4, Extension 정보
+- System Extension 목록
+- 각 `system_profiler` data type을 독립 수집하여 일부 실패가 전체 수집을 중단하지 않도록 처리
 
 **Linux**
 
-- `/proc`, `/sys`, DMI sysfs 기반 OS/CPU/메인보드/BIOS/메모리/PCI/USB/네트워크/DRM 정보
-- `lsblk` 기반 스토리지 정보
-- 설치되어 있는 경우 `lspci`, `lsusb`, `dmidecode`의 추가 정보
+- 배포판/커널/CPU
+- 메인보드/BIOS/DMI
+- RAM 및 `dmidecode` 메모리 모듈 정보(사용 가능한 경우)
+- 스토리지/파일시스템/UUID/모델/시리얼/펌웨어 revision
+- PCI/USB 장치와 커널 드라이버/드라이버 버전
+- GPU/DRM 카드
+- 모니터 연결 상태/모드/EDID 제조사·제품·시리얼
+- 네트워크 어댑터
+- 전원/배터리
+- hwmon 온도/팬/전압/전력 등 커널이 노출하는 센서 값
+- ALSA 오디오, 입력 장치, Bluetooth 컨트롤러
+- 설치되어 있는 경우 `lspci`, `lsusb`, `dmidecode` 추가 정보
 
-> 어떤 OS에서도 “모든 물리 부품을 100% 식별”하는 것은 보장할 수 없습니다. PSU처럼 소프트웨어 인터페이스를 제공하지 않는 장치나 펌웨어/드라이버가 노출하지 않는 값은 읽을 수 없습니다.
+> 어떤 OS에서도 모든 물리 부품을 100% 식별할 수 있다고 보장하지 않습니다. 일반 PSU처럼 소프트웨어 인터페이스가 없거나 펌웨어/드라이버가 값을 노출하지 않는 장치는 확인할 수 없습니다.
+
+### 권한과 보안
+
+HowAmI를 일반 권한으로 실행하면 부모 프로세스는 그대로 일반 사용자 권한을 유지합니다. 추가 권한이 필요할 때만 별도 관리자/root child가 하드웨어 수집을 수행하고 임시 handoff 파일로 결과를 돌려준 뒤 종료합니다. 최종 TXT/JSON은 사용자 프로세스가 작성합니다.
+
+관리자/root 환경에서 PATH 검색으로 다른 실행파일이 선택되는 위험을 줄이기 위해 외부 시스템 도구는 신뢰된 시스템 경로만 사용합니다. 수집용 외부 프로세스에는 timeout도 적용합니다.
 
 ### 개인정보
 
-현재 기본 리포트는 **개인 확인용 상세 리포트**를 목표로 하므로 다음과 같은 고유 식별 정보가 포함될 수 있습니다.
+상세 리포트에는 다음 값이 포함될 수 있습니다.
 
-- 장치/보드/디스크/RAM 시리얼 번호
+- 장치/보드/BIOS/RAM/스토리지/모니터 시리얼
 - 시스템 UUID
 - MAC 주소
 - 호스트명
 - PnP/PCI/USB 장치 식별자
+- 볼륨/파일시스템 UUID
+- 입력 장치 Unique ID
+- 드라이버/INF 식별 정보
 
-리포트는 로컬에서 생성되며 HowAmI가 외부 서버로 업로드하지 않습니다. 단, 생성 파일을 다른 사람에게 전달하기 전에는 내용을 직접 확인해야 합니다.
+HowAmI가 이 정보를 네트워크로 전송하지는 않습니다. 다른 사람이나 서비스에 리포트를 전달하기 전에는 사용자가 직접 내용을 확인해야 합니다.
+
+### 사용
+
+기본 실행:
+
+```text
+HowAmI
+```
+
+출력 위치 지정:
+
+```text
+HowAmI --output <directory>
+```
+
+권한 상승 없이 실행:
+
+```text
+HowAmI --no-elevate
+```
 
 ### 빌드
 
-Rust 툴체인이 필요합니다.
+Rust stable toolchain이 필요합니다.
 
 ```bash
 cargo build --release
 ```
 
-산출물:
+기본 산출물:
 
 - Windows: `target/release/HowAmI.exe`
 - macOS/Linux: `target/release/HowAmI`
 
-자동 CI/GitHub Actions는 사용하지 않습니다. 각 운영체제에서 로컬로 빌드·검증합니다.
+GitHub Actions/유료 CI는 사용하지 않습니다. 각 대상 OS/아키텍처에서 로컬 빌드와 실제 장비 검증을 수행합니다.
 
-자세한 내용은 [`docs/BUILD.md`](docs/BUILD.md)를 참고하세요.
+자세한 내용: [`docs/BUILD.md`](docs/BUILD.md)  
+아키텍처: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
+개인정보: [`docs/PRIVACY.md`](docs/PRIVACY.md)
 
 ---
 
 ## English
 
-### Goals
+### Purpose
 
-- Collect as much system information as the operating system and devices can expose with one run.
-- Request Administrator privileges on Windows and Administrator/root privileges on macOS/Linux where possible.
-- Write `HowAmI_Report_*.txt` and `HowAmI_Report_*.json` to the Desktop by default.
-- Do not implement server upload or remote transmission in HowAmI itself.
-- Never guess values that the OS, firmware, or device does not expose.
+- Collect as much system information as the OS and devices expose in one run.
+- Never guess a value that cannot be discovered reliably.
+- Write `HowAmI_Report_*.txt` and `HowAmI_Report_*.json` to the user's Desktop by default.
+- Do not implement server upload, remote analysis, or telemetry.
+- Perform Administrator/root-only collection in a separate elevated child and write final reports from the normal user process.
 
 ### Current collection scope
 
 **Windows**
 
-- OS and system model
-- CPU and GPU
-- Mainboard and BIOS/UEFI
-- Physical memory modules
-- Disks, volumes, firmware/status where exposed by Windows
-- Monitors and WMI EDID data
-- Network, audio, USB, Bluetooth, and battery devices
-- Currently present PnP devices
-- Signed PnP drivers and driver versions
-- TPM and Secure Boot where available
+- Windows version/build and system model
+- CPU, GPU, GPU driver, current resolution/refresh rate
+- registry-assisted GPU VRAM where Windows exposes it
+- mainboard and BIOS/UEFI
+- physical RAM modules, speed, part number, serial
+- disks, physical disks, volumes, firmware, health/status
+- monitors and WMI EDID
+- network, audio, USB, Bluetooth, and battery devices
+- currently present PnP devices
+- PnP driver versions, INF files, and signing information
+- TPM and Secure Boot
 
 **macOS**
 
+- macOS version and kernel
 - `system_profiler` Hardware, Display/GPU, Memory, Storage/NVMe, Audio, USB, Network, Bluetooth, Power, PCI, Thunderbolt/USB4, and Extension data
-- macOS version and kernel information
-- System Extension list where available
+- System Extension list
+- independent collection per `system_profiler` data type so one failure does not discard the rest
 
 **Linux**
 
-- OS/CPU/mainboard/BIOS/memory/PCI/USB/network/DRM data from `/proc`, `/sys`, and DMI sysfs
-- Storage data from `lsblk`
-- Additional data from `lspci`, `lsusb`, and `dmidecode` when those tools are installed
+- distribution/kernel/CPU
+- mainboard/BIOS/DMI
+- RAM plus `dmidecode` memory-module detail when available
+- storage/filesystems/UUID/model/serial/firmware revision
+- PCI/USB devices and kernel driver/version information
+- GPU/DRM cards
+- monitor connection modes and EDID manufacturer/product/serial data
+- network adapters
+- power supplies and batteries
+- kernel-exposed hwmon temperature/fan/voltage/power sensors
+- ALSA audio, input devices, and Bluetooth controllers
+- additional `lspci`, `lsusb`, and `dmidecode` output when installed
 
-> No operating system can guarantee identification of every physical component. Devices such as conventional PSUs, or values not exposed by firmware/drivers, cannot be discovered reliably in software.
+> No operating system can guarantee discovery of every physical component. Devices such as conventional PSUs, or values not exposed by firmware/drivers, cannot be identified reliably in software.
+
+### Privileges and security
+
+When HowAmI starts as a normal user, the parent process stays unprivileged. A separate Administrator/root child performs only the collection that benefits from elevation, returns the result through a temporary handoff file, and exits. The normal user process writes the final TXT/JSON files.
+
+External helper programs are launched only from trusted system locations rather than arbitrary PATH matches while elevated. Collector subprocesses also have timeouts.
 
 ### Privacy
 
-The current default report is intentionally detailed for personal inspection and may contain unique identifiers such as:
+Detailed reports may include:
 
-- device/board/disk/RAM serial numbers
+- device/board/BIOS/RAM/storage/monitor serial numbers
 - system UUID
 - MAC addresses
 - host name
 - PnP/PCI/USB identifiers
+- volume/filesystem UUIDs
+- input-device unique IDs
+- driver/INF identifiers
 
-Reports are generated locally and HowAmI does not upload them to any server. Review a report before sharing it with another person or service.
+HowAmI does not transmit these values over the network. Review a report yourself before sharing it with another person or service.
+
+### Usage
+
+Default:
+
+```text
+HowAmI
+```
+
+Custom output directory:
+
+```text
+HowAmI --output <directory>
+```
+
+Disable privilege elevation:
+
+```text
+HowAmI --no-elevate
+```
 
 ### Build
 
-A Rust toolchain is required.
+A stable Rust toolchain is required.
 
 ```bash
 cargo build --release
 ```
 
-Artifacts:
+Default artifacts:
 
 - Windows: `target/release/HowAmI.exe`
 - macOS/Linux: `target/release/HowAmI`
 
-No automated CI or GitHub Actions are used. Builds and validation are performed locally on each target operating system.
+No GitHub Actions or paid CI are used. Builds and physical-device validation are performed locally for each target OS/architecture.
 
-See [`docs/BUILD.md`](docs/BUILD.md) for details.
+Details: [`docs/BUILD.md`](docs/BUILD.md)  
+Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
+Privacy: [`docs/PRIVACY.md`](docs/PRIVACY.md)
 
 ## License
 
