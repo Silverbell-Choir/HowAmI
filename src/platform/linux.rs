@@ -1,5 +1,8 @@
 use super::Collection;
-use crate::model::{DeviceRecord, Section};
+use crate::{
+    edid,
+    model::{DeviceRecord, Section},
+};
 use serde_json::Value;
 use std::{
     fs,
@@ -316,21 +319,27 @@ fn collect_displays() -> Section {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
+        let connector_name = entry.file_name().to_string_lossy().to_string();
         let Some(status) = read_trimmed(path.join("status")) else {
             continue;
         };
         if status != "connected" {
             continue;
         }
-        let mut record = DeviceRecord::new(name);
+
+        let mut record = DeviceRecord::new(connector_name);
         record.insert("status", status);
         if let Some(modes) = read_trimmed(path.join("modes")) {
             record.insert("modes", modes.replace('\n', ", "));
         }
-        if let Ok(edid) = fs::read(path.join("edid")) {
-            if !edid.is_empty() {
-                record.insert("edid_bytes", edid.len().to_string());
+        if let Ok(raw_edid) = fs::read(path.join("edid")) {
+            if !raw_edid.is_empty() {
+                record.insert("edid_bytes", raw_edid.len().to_string());
+                if let Some(fields) = edid::parse_edid(&raw_edid) {
+                    for (key, value) in fields {
+                        record.insert(key, value);
+                    }
+                }
             }
         }
         section.push(record);
