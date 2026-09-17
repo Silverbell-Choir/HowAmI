@@ -31,12 +31,14 @@ pub fn run_capture(command: &mut Command, timeout: Duration) -> io::Result<Captu
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = command.spawn()?;
 
-    let stdout = child.stdout.take().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::Other, "failed to capture child stdout")
-    })?;
-    let stderr = child.stderr.take().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::Other, "failed to capture child stderr")
-    })?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| io::Error::other("failed to capture child stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| io::Error::other("failed to capture child stderr"))?;
 
     let stdout_reader = thread::spawn(move || read_all(stdout));
     let stderr_reader = thread::spawn(move || read_all(stderr));
@@ -73,9 +75,9 @@ fn read_all<R: Read>(mut reader: R) -> io::Result<Vec<u8>> {
 fn join_reader(
     handle: thread::JoinHandle<io::Result<Vec<u8>>>,
 ) -> io::Result<Vec<u8>> {
-    handle.join().map_err(|_| {
-        io::Error::new(io::ErrorKind::Other, "command output reader thread panicked")
-    })?
+    handle
+        .join()
+        .map_err(|_| io::Error::other("command output reader thread panicked"))?
 }
 
 #[cfg(target_os = "windows")]
