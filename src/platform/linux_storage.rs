@@ -17,9 +17,13 @@ fn collect_nvme() -> Section {
 
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !name.starts_with("nvme") || name.contains('n') {
+        let Some(index) = name.strip_prefix("nvme") else {
+            continue;
+        };
+        if index.is_empty() || !index.chars().all(|ch| ch.is_ascii_digit()) {
             continue;
         }
+
         let path = entry.path();
         let mut record = DeviceRecord::new(name);
         for field in [
