@@ -1,25 +1,36 @@
 use super::Collection;
-use std::process::Command;
+use crate::command;
+use std::{process::Command, time::Duration};
 
 pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
-    let output = Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            POWERSHELL_COLLECTOR,
-        ])
-        .output()?;
+    let powershell = command::windows_powershell()?;
+    let mut process = Command::new(powershell);
+    process.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        POWERSHELL_COLLECTOR,
+    ]);
 
+    let output = command::run_capture(&mut process, Duration::from_secs(120))?;
+    if output.timed_out {
+        return Err("Windows collector timed out after 120 seconds".into());
+    }
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Windows collector failed: {}", stderr.trim()).into());
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let payload: Collection = serde_json::from_str(stdout.trim())?;
+    let stdout = String::from_utf8(output.stdout)?;
+    let mut payload: Collection = serde_json::from_str(stdout.trim())?;
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stderr.is_empty() {
+        payload
+            .warnings
+            .push(format!("PowerShell collector diagnostics: {stderr}"));
+    }
     Ok(payload)
 }
 
@@ -82,6 +93,8 @@ if ($cs) {
         Name = $cs.Name
         Domain = $cs.Domain
         TotalPhysicalMemoryBytes = $cs.TotalPhysicalMemory
+        HypervisorPresent = $cs.HypervisorPresent
+        BootupState = $cs.BootupState
     })
 }
 Add-Section 'System' $systemRecords
@@ -111,7 +124,7 @@ $gpuRecords = @(Get-CimInstance Win32_VideoController | ForEach-Object {
         Name = $_.Name
         VideoProcessor = $_.VideoProcessor
         AdapterCompatibility = $_.AdapterCompatibility
-        AdapterRAMBytes = $_.AdapterRAM
+        AdapterRAMLegacy32BitBytes = $_.AdapterRAM
         DriverVersion = $_.DriverVersion
         DriverDate = $_.DriverDate
         PNPDeviceID = $_.PNPDeviceID
@@ -121,6 +134,45 @@ $gpuRecords = @(Get-CimInstance Win32_VideoController | ForEach-Object {
     })
 })
 Add-Section 'GPU' $gpuRecords
+
+$gpuMemoryRecords = @()
+$videoRoot = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Video'
+if (Test-Path $videoRoot) {
+    Get-ChildItem $videoRoot | ForEach-Object {
+        $guidKey = $_
+        Get-ChildItem $guidKey.PSPath | Where-Object { $_.PSChildName -match '^\d{4}$' } | ForEach-Object {
+            $adapterKey = $_
+            $props = Get-ItemProperty $adapterKey.PSPath
+            $vramBytes = $null
+            $vramSource = $null
+            $qword = $props.'HardwareInformation.qwMemorySize'
+            $legacy = $props.'HardwareInformation.MemorySize'
+            if ($null -ne $qword) {
+                try {
+                    $vramBytes = [uint64]$qword
+                    $vramSource = 'HardwareInformation.qwMemorySize'
+                } catch {}
+            }
+            if ($null -eq $vramBytes -and $null -ne $legacy) {
+                try {
+                    $vramBytes = [uint64]([uint32]$legacy)
+                    $vramSource = 'HardwareInformation.MemorySize (legacy 32-bit)'
+                } catch {}
+            }
+            if ($props.DriverDesc -or $null -ne $vramBytes) {
+                $gpuMemoryRecords += New-Record $props.DriverDesc ([ordered]@{
+                    DriverDesc = $props.DriverDesc
+                    ProviderName = $props.ProviderName
+                    DriverVersion = $props.DriverVersion
+                    MatchingDeviceId = $props.MatchingDeviceId
+                    VRAMBytes = $vramBytes
+                    VRAMSource = $vramSource
+                })
+            }
+        }
+    }
+}
+Add-Section 'GPU Memory (Registry)' $gpuMemoryRecords
 
 $boardRecords = @(Get-CimInstance Win32_BaseBoard | ForEach-Object {
     New-Record 'Mainboard' ([ordered]@{
