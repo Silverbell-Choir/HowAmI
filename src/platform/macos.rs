@@ -8,7 +8,9 @@ use std::{collections::BTreeMap, process::Command, time::Duration};
 
 pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     let mut collection = Collection::default();
-    collection.sections.push(collect_system(&mut collection.warnings));
+    collection
+        .sections
+        .push(collect_system(&mut collection.warnings));
 
     let data_types = [
         "SPHardwareDataType",
@@ -31,9 +33,9 @@ pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
         for data_type in data_types {
             match collect_profiler_type(&profiler, data_type) {
                 Ok(section) => collection.sections.push(section),
-                Err(error) => collection.warnings.push(format!(
-                    "system_profiler {data_type} failed: {error}"
-                )),
+                Err(error) => collection
+                    .warnings
+                    .push(format!("system_profiler {data_type} failed: {error}")),
             }
         }
     } else {
@@ -55,7 +57,7 @@ pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
                     collection.sections.push(Section {
                         name: "System Extensions".into(),
                         records: vec![
-                            DeviceRecord::new("systemextensionsctl").with_field("Raw", text),
+                            DeviceRecord::new("systemextensionsctl").with_field("Raw", text)
                         ],
                     });
                 }
@@ -191,7 +193,10 @@ fn flatten_json(prefix: &str, value: &Value, fields: &mut BTreeMap<String, Strin
             }
         }
         Value::Array(items) => {
-            if items.iter().all(|item| !item.is_object() && !item.is_array()) {
+            if items
+                .iter()
+                .all(|item| !item.is_object() && !item.is_array())
+            {
                 let joined = items
                     .iter()
                     .filter_map(|item| match item {

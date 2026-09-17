@@ -72,9 +72,7 @@ fn read_all<R: Read>(mut reader: R) -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
-fn join_reader(
-    handle: thread::JoinHandle<io::Result<Vec<u8>>>,
-) -> io::Result<Vec<u8>> {
+fn join_reader(handle: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
     handle
         .join()
         .map_err(|_| io::Error::other("command output reader thread panicked"))?
@@ -124,7 +122,7 @@ pub fn linux_program(name: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "macos")]
 fn existing_file(path: &str) -> Option<PathBuf> {
     let path = PathBuf::from(path);
     path.is_file().then_some(path)

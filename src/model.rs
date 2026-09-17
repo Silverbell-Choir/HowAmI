@@ -28,6 +28,7 @@ pub struct Section {
     pub records: Vec<DeviceRecord>,
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 impl Section {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
@@ -47,6 +48,7 @@ pub struct DeviceRecord {
     pub fields: BTreeMap<String, String>,
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 impl DeviceRecord {
     pub fn new(label: impl Into<String>) -> Self {
         Self {

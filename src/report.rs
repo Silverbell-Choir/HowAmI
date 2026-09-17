@@ -4,10 +4,22 @@ use std::fmt::Write as _;
 pub fn render_text(report: &SystemReport) -> String {
     let mut out = String::new();
 
-    let _ = writeln!(out, "╔══════════════════════════════════════════════════════════════╗");
-    let _ = writeln!(out, "║                            HowAmI                            ║");
-    let _ = writeln!(out, "║              Computer Hardware & System Report              ║");
-    let _ = writeln!(out, "╚══════════════════════════════════════════════════════════════╝");
+    let _ = writeln!(
+        out,
+        "╔══════════════════════════════════════════════════════════════╗"
+    );
+    let _ = writeln!(
+        out,
+        "║                            HowAmI                            ║"
+    );
+    let _ = writeln!(
+        out,
+        "║              Computer Hardware & System Report              ║"
+    );
+    let _ = writeln!(
+        out,
+        "╚══════════════════════════════════════════════════════════════╝"
+    );
     let _ = writeln!(out);
     let _ = writeln!(out, "Generated At         : {}", report.meta.generated_at);
     let _ = writeln!(out, "Version              : {}", report.meta.app_version);
@@ -36,9 +48,15 @@ pub fn render_text(report: &SystemReport) -> String {
 
     for section in &report.sections {
         let _ = writeln!(out);
-        let _ = writeln!(out, "==============================================================");
+        let _ = writeln!(
+            out,
+            "=============================================================="
+        );
         let _ = writeln!(out, "[ {} ]", section.name);
-        let _ = writeln!(out, "==============================================================");
+        let _ = writeln!(
+            out,
+            "=============================================================="
+        );
 
         if section.records.is_empty() {
             let _ = writeln!(out, "Not available / 데이터 없음");

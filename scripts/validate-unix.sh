@@ -11,14 +11,14 @@ fi
 printf '%s\n' '[1/4] cargo fmt --check'
 cargo fmt --check
 
-printf '%s\n' '[2/4] cargo test'
-cargo test
+printf '%s\n' '[2/4] cargo test --locked'
+cargo test --locked
 
-printf '%s\n' '[3/4] cargo clippy --all-targets -- -D warnings'
-cargo clippy --all-targets -- -D warnings
+printf '%s\n' '[3/4] cargo clippy --all-targets --locked -- -D warnings'
+cargo clippy --all-targets --locked -- -D warnings
 
-printf '%s\n' '[4/4] cargo build --release'
-cargo build --release
+printf '%s\n' '[4/4] cargo build --release --locked'
+cargo build --release --locked
 
 printf '%s\n' 'Validation completed / 검증 완료: target/release/HowAmI'
 printf '%s\n' 'Run the binary and review both generated TXT and JSON before making the repository public.'

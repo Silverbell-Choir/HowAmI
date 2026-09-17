@@ -10,16 +10,16 @@ Write-Host '[1/4] cargo fmt --check'
 cargo fmt --check
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host '[2/4] cargo test'
-cargo test
+Write-Host '[2/4] cargo test --locked'
+cargo test --locked
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host '[3/4] cargo clippy --all-targets -- -D warnings'
-cargo clippy --all-targets -- -D warnings
+Write-Host '[3/4] cargo clippy --all-targets --locked -- -D warnings'
+cargo clippy --all-targets --locked -- -D warnings
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host '[4/4] cargo build --release'
-cargo build --release
+Write-Host '[4/4] cargo build --release --locked'
+cargo build --release --locked
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $binary = Join-Path $PSScriptRoot '..\target\release\HowAmI.exe'

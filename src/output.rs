@@ -100,9 +100,8 @@ fn windows_desktop() -> Option<PathBuf> {
     use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr, slice};
 
     let mut raw: *mut u16 = ptr::null_mut();
-    let result = unsafe {
-        sh_get_known_folder_path(&FOLDERID_DESKTOP, 0, ptr::null_mut(), &mut raw)
-    };
+    let result =
+        unsafe { sh_get_known_folder_path(&FOLDERID_DESKTOP, 0, ptr::null_mut(), &mut raw) };
     if result < 0 || raw.is_null() {
         return None;
     }

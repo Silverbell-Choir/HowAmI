@@ -77,11 +77,7 @@ pub fn run_elevated_child(
 }
 
 #[cfg(target_os = "windows")]
-fn run_windows(
-    exe: &Path,
-    handoff: &Path,
-    token: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn run_windows(exe: &Path, handoff: &Path, token: &str) -> Result<(), Box<dyn std::error::Error>> {
     let powershell = command::windows_powershell()?;
     let exe = powershell_single_quote(&exe.to_string_lossy());
     let handoff = powershell_single_quote(&handoff.to_string_lossy());
@@ -104,18 +100,17 @@ fn run_windows(
     if status.success() {
         Ok(())
     } else {
-        Err(format!("UAC elevation was cancelled or the elevated collector failed ({status})").into())
+        Err(
+            format!("UAC elevation was cancelled or the elevated collector failed ({status})")
+                .into(),
+        )
     }
 }
 
 #[cfg(target_os = "macos")]
-fn run_macos(
-    exe: &Path,
-    handoff: &Path,
-    token: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let osascript = command::macos_program("osascript")
-        .ok_or("trusted /usr/bin/osascript was not found")?;
+fn run_macos(exe: &Path, handoff: &Path, token: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let osascript =
+        command::macos_program("osascript").ok_or("trusted /usr/bin/osascript was not found")?;
     let shell_command = format!(
         "{} --elevated-child {} {}",
         shell_single_quote(&exe.to_string_lossy()),
@@ -131,16 +126,15 @@ fn run_macos(
     if status.success() {
         Ok(())
     } else {
-        Err(format!("administrator authorization was cancelled or the elevated collector failed ({status})").into())
+        Err(format!(
+            "administrator authorization was cancelled or the elevated collector failed ({status})"
+        )
+        .into())
     }
 }
 
 #[cfg(target_os = "linux")]
-fn run_linux(
-    exe: &Path,
-    handoff: &Path,
-    token: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn run_linux(exe: &Path, handoff: &Path, token: &str) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(pkexec) = command::linux_program("pkexec") {
         let status = Command::new(pkexec)
             .arg(exe)

@@ -7,7 +7,7 @@ HowAmI는 Windows, macOS, Linux에서 하드웨어·펌웨어·드라이버·운
 
 HowAmI is an open-source Windows, macOS, and Linux utility that collects hardware, firmware, driver, and operating-system information **locally** and writes TXT and JSON reports.
 
-> **Development status / 개발 상태:** `v0.1.x` source implementation. Keep the repository private until local builds, real-device validation, and privacy review are complete. / 현재 `v0.1.x` 소스 구현 단계입니다. 로컬 빌드·실장비 검증·개인정보 검토가 끝날 때까지 Private 유지가 권장됩니다.
+> **Development status / 개발 상태:** `v0.1.0` build candidate. Windows x64 was built and run on Windows x64; Linux x64/arm64 static binaries were cross-built but not run on target hardware. Windows arm64 and macOS binaries are not included. Keep the repository private until the remaining real-device and privacy checks are complete. / `v0.1.0` 빌드 후보입니다. Windows x64는 Windows x64에서 빌드·실행했고, Linux x64/arm64 정적 바이너리는 크로스빌드했지만 대상 실장비에서 실행하지 않았습니다. Windows arm64와 macOS 바이너리는 포함하지 않았습니다. 남은 실장비·개인정보 검토가 끝날 때까지 Private 유지를 권장합니다.
 
 ---
 
@@ -104,13 +104,22 @@ HowAmI --no-elevate
 Rust stable `1.74+`가 필요합니다.
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ```
 
 산출물:
 
 - Windows: `target/release/HowAmI.exe`
 - macOS/Linux: `target/release/HowAmI`
+
+현재 준비된 `v0.1.0` 실행 파일:
+
+- [Windows x64](release/dist/v0.1.0/HowAmI-Windows-x64.exe): 네이티브 빌드 및 `--no-elevate` 실행 검증 완료
+- [Linux x64](release/dist/v0.1.0/HowAmI-Linux-x64): 정적 musl 크로스빌드, 대상 실장비 실행 미검증
+- [Linux arm64](release/dist/v0.1.0/HowAmI-Linux-arm64): 정적 musl 크로스빌드, 대상 실장비 실행 미검증
+- [SHA-256 체크섬](release/dist/v0.1.0/SHA256SUMS.txt) 및 [빌드 정보](release/dist/v0.1.0/BUILD-INFO.md)
+
+검증되지 않은 Windows arm64와 macOS 파일은 만들지 않았습니다.
 
 **GitHub Actions/유료 CI는 사용하지 않습니다.** 각 대상 OS/아키텍처에서 로컬 빌드와 실제 장비 검증을 수행합니다.
 
@@ -215,13 +224,22 @@ HowAmI --no-elevate
 Stable Rust `1.74+` is required.
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ```
 
 Artifacts:
 
 - Windows: `target/release/HowAmI.exe`
 - macOS/Linux: `target/release/HowAmI`
+
+Prepared `v0.1.0` executables:
+
+- [Windows x64](release/dist/v0.1.0/HowAmI-Windows-x64.exe): native build and `--no-elevate` runtime check passed
+- [Linux x64](release/dist/v0.1.0/HowAmI-Linux-x64): statically linked musl cross-build; not executed on target hardware
+- [Linux arm64](release/dist/v0.1.0/HowAmI-Linux-arm64): statically linked musl cross-build; not executed on target hardware
+- [SHA-256 checksums](release/dist/v0.1.0/SHA256SUMS.txt) and [build information](release/dist/v0.1.0/BUILD-INFO.md)
+
+No unverified Windows arm64 or macOS binary was fabricated.
 
 **No GitHub Actions or paid CI are used.** Builds and physical-device validation are performed locally for each target OS/architecture.
 

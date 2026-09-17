@@ -1,6 +1,6 @@
+mod command;
 #[cfg(target_os = "linux")]
 mod edid;
-mod command;
 mod elevation;
 mod model;
 mod output;
@@ -143,12 +143,11 @@ fn create_handoff_file() -> Result<(PathBuf, String), Box<dyn std::error::Error>
     Err("could not create a unique elevation handoff file".into())
 }
 
-fn run_elevated_child(
-    handoff: &Path,
-    token: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn run_elevated_child(handoff: &Path, token: &str) -> Result<(), Box<dyn std::error::Error>> {
     if !elevation::is_elevated() {
-        return Err("elevated child marker was supplied without Administrator/root privileges".into());
+        return Err(
+            "elevated child marker was supplied without Administrator/root privileges".into(),
+        );
     }
 
     let path_metadata = fs::symlink_metadata(handoff)?;

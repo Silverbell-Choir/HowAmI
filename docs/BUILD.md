@@ -14,9 +14,9 @@
 
 ```bash
 cargo fmt --check
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo build --release
+cargo test --locked
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --release --locked
 ```
 
 동일 절차를 실행하는 보조 스크립트도 제공합니다.
@@ -35,10 +35,32 @@ sh scripts/validate-unix.sh
 
 `cargo build` 또는 `cargo generate-lockfile`을 처음 실행하면 `Cargo.lock`이 생성됩니다. HowAmI는 애플리케이션이므로 실제 릴리스 빌드를 확정할 때 생성된 `Cargo.lock`도 저장소에 커밋합니다.
 
+### 현재 검증 상태 (2026-09-17)
+
+| 대상 | 결과 | 현재 환경에서 수행한 검증 |
+| --- | --- | --- |
+| Windows x64 (`x86_64-pc-windows-msvc`) | 실행 파일 포함 | stable `fmt/test/clippy/build`, Rust 1.74 `test/build`, Windows x64에서 `--no-elevate` 실행 및 TXT/JSON 구조 확인 |
+| Windows arm64 (`aarch64-pc-windows-msvc`) | 실행 파일 없음 | clippy 통과. ARM64 MSVC/CRT 라이브러리가 설치되지 않아 링크 실패 |
+| macOS x64/arm64 | 실행 파일 없음 | 두 Rust target의 clippy 통과. Apple SDK·링커·macOS 실장비가 없어 링크/실행하지 않음 |
+| Linux x64/arm64 musl | 실행 파일 포함 | 대상별 clippy, `cargo test --no-run`, 정적 release 크로스빌드 통과. Linux 실장비 실행은 미검증 |
+
+실행 파일과 체크섬은 다음 구조로 저장합니다.
+
+```text
+release/dist/v0.1.0/
+├── HowAmI-Windows-x64.exe
+├── HowAmI-Linux-x64
+├── HowAmI-Linux-arm64
+├── SHA256SUMS.txt
+└── BUILD-INFO.md
+```
+
+목록에 없는 대상의 빈 파일이나 추정 산출물은 만들지 않습니다. 현재 산출물의 정확한 빌드 조건과 남은 한계는 `BUILD-INFO.md`에 기록합니다.
+
 ### Windows
 
 ```powershell
-cargo build --release
+cargo build --release --locked
 .\target\release\HowAmI.exe
 ```
 
@@ -56,7 +78,7 @@ aarch64-pc-windows-msvc
 ### macOS
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ./target/release/HowAmI
 ```
 
@@ -72,7 +94,7 @@ aarch64-apple-darwin
 ### Linux
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ./target/release/HowAmI
 ```
 
@@ -83,7 +105,11 @@ cargo build --release
 ```text
 x86_64-unknown-linux-gnu
 aarch64-unknown-linux-gnu
+x86_64-unknown-linux-musl
+aarch64-unknown-linux-musl
 ```
+
+현재 저장된 Linux 배포 후보는 Windows x64에서 `rust-lld`로 링크한 정적 musl 바이너리입니다. 크로스빌드와 테스트 바이너리 링크는 통과했지만 Linux 실장비에서 실행하기 전까지 공식 검증 완료로 간주하지 않습니다.
 
 일부 Linux 상세 정보는 다음 도구가 설치되어 있을 때 추가됩니다.
 
@@ -135,9 +161,9 @@ Run the following on each target OS after code changes:
 
 ```bash
 cargo fmt --check
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo build --release
+cargo test --locked
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --release --locked
 ```
 
 Helper scripts run the same sequence.
@@ -156,10 +182,32 @@ sh scripts/validate-unix.sh
 
 The first `cargo build` or `cargo generate-lockfile` creates `Cargo.lock`. HowAmI is an application, so commit the lockfile produced by the validated release toolchain before the first Release.
 
+### Current validation status (2026-09-17)
+
+| Target | Result | Validation performed in the current environment |
+| --- | --- | --- |
+| Windows x64 (`x86_64-pc-windows-msvc`) | Executable included | stable `fmt/test/clippy/build`, Rust 1.74 `test/build`, and a Windows x64 `--no-elevate` run with TXT/JSON structure checks |
+| Windows arm64 (`aarch64-pc-windows-msvc`) | No executable | clippy passed; linking failed because the ARM64 MSVC/CRT libraries are not installed |
+| macOS x64/arm64 | No executables | clippy passed for both Rust targets; linking/running was not attempted without an Apple SDK, linker, or macOS hardware |
+| Linux x64/arm64 musl | Executables included | target clippy, `cargo test --no-run`, and static release cross-builds passed; not executed on Linux hardware |
+
+Executables and checksums use this layout:
+
+```text
+release/dist/v0.1.0/
+├── HowAmI-Windows-x64.exe
+├── HowAmI-Linux-x64
+├── HowAmI-Linux-arm64
+├── SHA256SUMS.txt
+└── BUILD-INFO.md
+```
+
+Do not create empty or guessed artifacts for targets not listed. `BUILD-INFO.md` records the exact build conditions and remaining limitations.
+
 ### Windows
 
 ```powershell
-cargo build --release
+cargo build --release --locked
 .\target\release\HowAmI.exe
 ```
 
@@ -177,7 +225,7 @@ Validate each architecture on real hardware before distributing it.
 ### macOS
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ./target/release/HowAmI
 ```
 
@@ -193,7 +241,7 @@ aarch64-apple-darwin
 ### Linux
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ./target/release/HowAmI
 ```
 
@@ -204,7 +252,11 @@ Primary targets:
 ```text
 x86_64-unknown-linux-gnu
 aarch64-unknown-linux-gnu
+x86_64-unknown-linux-musl
+aarch64-unknown-linux-musl
 ```
+
+The currently stored Linux candidates are static musl binaries linked with `rust-lld` on Windows x64. Cross-compilation and test-binary linking passed, but they are not considered fully validated until executed on real Linux hardware.
 
 Additional Linux detail is collected when these tools are installed:
 

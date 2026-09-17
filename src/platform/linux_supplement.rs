@@ -84,7 +84,11 @@ fn collect_firmware_security() -> Section {
     let efi_root = Path::new("/sys/firmware/efi");
     boot.insert(
         "BootMode",
-        if efi_root.is_dir() { "UEFI" } else { "Legacy / non-UEFI" },
+        if efi_root.is_dir() {
+            "UEFI"
+        } else {
+            "Legacy / non-UEFI"
+        },
     );
 
     let efivars = efi_root.join("efivars");
@@ -225,14 +229,7 @@ fn is_sensor_field(name: &str) -> bool {
         "temp", "fan", "in", "curr", "power", "energy", "humidity", "pwm",
     ];
     let suffixes = [
-        "_input",
-        "_label",
-        "_min",
-        "_max",
-        "_crit",
-        "_alarm",
-        "_average",
-        "_highest",
+        "_input", "_label", "_min", "_max", "_crit", "_alarm", "_average", "_highest",
     ];
     prefixes.iter().any(|prefix| name.starts_with(prefix))
         && suffixes.iter().any(|suffix| name.ends_with(suffix))

@@ -153,11 +153,29 @@ mod tests {
         edid[127] = 0u8.wrapping_sub(checksum);
 
         let fields = parse_edid(&edid).expect("valid EDID should parse");
-        assert_eq!(fields.get("EDID Manufacturer").map(String::as_str), Some("DEL"));
-        assert_eq!(fields.get("EDID Product Code").map(String::as_str), Some("4660"));
-        assert_eq!(fields.get("EDID Numeric Serial").map(String::as_str), Some("16909060"));
-        assert_eq!(fields.get("Manufacture Year").map(String::as_str), Some("2020"));
-        assert_eq!(fields.get("Monitor Name").map(String::as_str), Some("ExamplePanel"));
-        assert_eq!(fields.get("Base Block Checksum").map(String::as_str), Some("true"));
+        assert_eq!(
+            fields.get("EDID Manufacturer").map(String::as_str),
+            Some("DEL")
+        );
+        assert_eq!(
+            fields.get("EDID Product Code").map(String::as_str),
+            Some("4660")
+        );
+        assert_eq!(
+            fields.get("EDID Numeric Serial").map(String::as_str),
+            Some("16909060")
+        );
+        assert_eq!(
+            fields.get("Manufacture Year").map(String::as_str),
+            Some("2020")
+        );
+        assert_eq!(
+            fields.get("Monitor Name").map(String::as_str),
+            Some("ExamplePanel")
+        );
+        assert_eq!(
+            fields.get("Base Block Checksum").map(String::as_str),
+            Some("true")
+        );
     }
 }

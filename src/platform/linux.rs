@@ -14,7 +14,9 @@ use std::{
 pub fn collect() -> Result<Collection, Box<dyn std::error::Error>> {
     let mut collection = Collection::default();
 
-    collection.sections.push(collect_system(&mut collection.warnings));
+    collection
+        .sections
+        .push(collect_system(&mut collection.warnings));
     collection.sections.push(collect_cpu());
     collection.sections.push(collect_dmi());
     collection.sections.push(collect_memory());
@@ -97,7 +99,10 @@ fn collect_system(warnings: &mut Vec<String>) -> Section {
 fn collect_cpu() -> Section {
     let mut section = Section::new("CPU");
     let text = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
-    let blocks: Vec<&str> = text.split("\n\n").filter(|b| !b.trim().is_empty()).collect();
+    let blocks: Vec<&str> = text
+        .split("\n\n")
+        .filter(|b| !b.trim().is_empty())
+        .collect();
 
     let mut summary = DeviceRecord::new("CPU Summary");
     let logical = std::thread::available_parallelism()
@@ -178,7 +183,8 @@ fn collect_memory() -> Section {
 
 fn collect_lsblk() -> Result<Section, Box<dyn std::error::Error>> {
     let lsblk = command::linux_program("lsblk").ok_or("lsblk was not found in trusted paths")?;
-    let columns = "NAME,KNAME,TYPE,SIZE,MODEL,VENDOR,SERIAL,REV,TRAN,ROTA,FSTYPE,FSVER,LABEL,UUID,MOUNTPOINT";
+    let columns =
+        "NAME,KNAME,TYPE,SIZE,MODEL,VENDOR,SERIAL,REV,TRAN,ROTA,FSTYPE,FSVER,LABEL,UUID,MOUNTPOINT";
     let mut process = Command::new(lsblk);
     process.args(["-J", "-b", "-o", columns]);
     let output = command::run_capture(&mut process, Duration::from_secs(20))?;
