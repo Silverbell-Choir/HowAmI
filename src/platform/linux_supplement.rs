@@ -198,11 +198,10 @@ fn split_alsa_cards(text: &str) -> Vec<DeviceRecord> {
     let mut current: Option<DeviceRecord> = None;
 
     for line in text.lines() {
-        let leading_trimmed = line.trim_end().trim_start();
+        let leading_trimmed = line.trim();
         let starts_card = leading_trimmed
             .split_once(' ')
-            .map(|(first, _)| first.chars().all(|ch| ch.is_ascii_digit()))
-            .unwrap_or(false)
+            .is_some_and(|(first, _)| first.chars().all(|ch| ch.is_ascii_digit()))
             && leading_trimmed.contains('[');
 
         if starts_card {
