@@ -92,6 +92,19 @@ fn display_value(section: &str, key: &str, value: &str) -> String {
         }
     }
 
+    if let Ok(code) = value.trim().parse::<u32>() {
+        let label = match key {
+            "ArchitectureCode" => processor_architecture_name(code),
+            "MemoryTypeCode" => cim_memory_type_name(code),
+            "SMBIOSMemoryTypeCode" => smbios_memory_type_name(code),
+            "FormFactorCode" => memory_form_factor_name(code),
+            _ => None,
+        };
+        if let Some(label) = label {
+            return format!("{value} ({label})");
+        }
+    }
+
     value.to_string()
 }
 
@@ -131,6 +144,131 @@ fn format_bits_per_second(bits: u64) -> String {
         format!("{:.2} kbit/s", value / 1_000.0)
     } else {
         format!("{bits} bit/s")
+    }
+}
+
+fn processor_architecture_name(code: u32) -> Option<&'static str> {
+    match code {
+        0 => Some("x86"),
+        1 => Some("MIPS"),
+        2 => Some("Alpha"),
+        3 => Some("PowerPC"),
+        5 => Some("ARM"),
+        6 => Some("IA64 / Itanium"),
+        9 => Some("x64"),
+        12 => Some("ARM64"),
+        _ => None,
+    }
+}
+
+fn cim_memory_type_name(code: u32) -> Option<&'static str> {
+    match code {
+        0 => Some("Unknown"),
+        1 => Some("Other"),
+        2 => Some("DRAM"),
+        3 => Some("Synchronous DRAM"),
+        4 => Some("Cache DRAM"),
+        5 => Some("EDO"),
+        6 => Some("EDRAM"),
+        7 => Some("VRAM"),
+        8 => Some("SRAM"),
+        9 => Some("RAM"),
+        10 => Some("ROM"),
+        11 => Some("Flash"),
+        12 => Some("EEPROM"),
+        13 => Some("FEPROM"),
+        14 => Some("EPROM"),
+        15 => Some("CDRAM"),
+        16 => Some("3DRAM"),
+        17 => Some("SDRAM"),
+        18 => Some("SGRAM"),
+        19 => Some("RDRAM"),
+        20 => Some("DDR"),
+        21 => Some("DDR2"),
+        22 => Some("DDR2 FB-DIMM"),
+        24 => Some("DDR3"),
+        25 => Some("FBD2"),
+        26 => Some("DDR4"),
+        27 => Some("LPDDR"),
+        28 => Some("LPDDR2"),
+        29 => Some("LPDDR3"),
+        30 => Some("LPDDR4"),
+        31 => Some("Logical non-volatile device"),
+        32 => Some("HBM"),
+        33 => Some("HBM2"),
+        34 => Some("DDR5"),
+        35 => Some("LPDDR5"),
+        36 => Some("HBM3"),
+        _ => None,
+    }
+}
+
+fn smbios_memory_type_name(code: u32) -> Option<&'static str> {
+    match code {
+        1 => Some("Other"),
+        2 => Some("Unknown"),
+        3 => Some("DRAM"),
+        4 => Some("EDRAM"),
+        5 => Some("VRAM"),
+        6 => Some("SRAM"),
+        7 => Some("RAM"),
+        8 => Some("ROM"),
+        9 => Some("Flash"),
+        10 => Some("EEPROM"),
+        11 => Some("FEPROM"),
+        12 => Some("EPROM"),
+        13 => Some("CDRAM"),
+        14 => Some("3DRAM"),
+        15 => Some("SDRAM"),
+        16 => Some("SGRAM"),
+        17 => Some("RDRAM"),
+        18 => Some("DDR"),
+        19 => Some("DDR2"),
+        20 => Some("DDR2 FB-DIMM"),
+        24 => Some("DDR3"),
+        25 => Some("FBD2"),
+        26 => Some("DDR4"),
+        27 => Some("LPDDR"),
+        28 => Some("LPDDR2"),
+        29 => Some("LPDDR3"),
+        30 => Some("LPDDR4"),
+        31 => Some("Logical non-volatile device"),
+        32 => Some("HBM"),
+        33 => Some("HBM2"),
+        34 => Some("DDR5"),
+        35 => Some("LPDDR5"),
+        36 => Some("HBM3"),
+        _ => None,
+    }
+}
+
+fn memory_form_factor_name(code: u32) -> Option<&'static str> {
+    match code {
+        0 => Some("Unknown"),
+        1 => Some("Other"),
+        2 => Some("SIP"),
+        3 => Some("DIP"),
+        4 => Some("ZIP"),
+        5 => Some("SOJ"),
+        6 => Some("Proprietary"),
+        7 => Some("SIMM"),
+        8 => Some("DIMM"),
+        9 => Some("TSOP"),
+        10 => Some("PGA"),
+        11 => Some("RIMM"),
+        12 => Some("SODIMM"),
+        13 => Some("SRIMM"),
+        14 => Some("SMD"),
+        15 => Some("SSMP"),
+        16 => Some("QFP"),
+        17 => Some("TQFP"),
+        18 => Some("SOIC"),
+        19 => Some("LCC"),
+        20 => Some("PLCC"),
+        21 => Some("BGA"),
+        22 => Some("FPBGA"),
+        23 => Some("LGA"),
+        _ => None,
     }
 }
 
@@ -184,6 +322,19 @@ mod tests {
         assert_eq!(
             display_value("Network Adapters", "SpeedBitsPerSecond", "1000000000"),
             "1000000000 (1.00 Gbit/s)"
+        );
+    }
+
+    #[test]
+    fn labels_common_windows_hardware_codes() {
+        assert_eq!(display_value("CPU", "ArchitectureCode", "9"), "9 (x64)");
+        assert_eq!(
+            display_value("Memory", "SMBIOSMemoryTypeCode", "34"),
+            "34 (DDR5)"
+        );
+        assert_eq!(
+            display_value("Memory", "FormFactorCode", "12"),
+            "12 (SODIMM)"
         );
     }
 }
