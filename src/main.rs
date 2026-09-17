@@ -1,3 +1,4 @@
+mod edid;
 mod elevation;
 mod model;
 mod output;
