@@ -85,10 +85,29 @@ fn display_value(section: &str, key: &str, value: &str) -> String {
 
     if key == "SpeedBitsPerSecond" {
         if let Ok(bits_per_second) = value.trim().parse::<u64>() {
-            return format!(
-                "{value} ({})",
-                format_bits_per_second(bits_per_second)
-            );
+            return format!("{value} ({})", format_bits_per_second(bits_per_second));
+        }
+    }
+
+    if section == "Network Adapters" && key == "speed" {
+        if let Ok(megabits) = value.trim().parse::<u64>() {
+            return if megabits >= 1000 {
+                format!("{value} Mbit/s ({:.2} Gbit/s)", megabits as f64 / 1000.0)
+            } else {
+                format!("{value} Mbit/s")
+            };
+        }
+    }
+
+    if section == "Hardware Sensors / hwmon" {
+        if let Some(display) = format_hwmon_value(key, value) {
+            return display;
+        }
+    }
+
+    if section == "Power / Battery" {
+        if let Some(display) = format_power_supply_value(key, value) {
+            return display;
         }
     }
 
@@ -109,9 +128,62 @@ fn display_value(section: &str, key: &str, value: &str) -> String {
 }
 
 fn is_byte_field(section: &str, key: &str) -> bool {
-    key.ends_with("Bytes")
-        || key == "VRAMBytes"
-        || (section == "Storage" && key.eq_ignore_ascii_case("size"))
+    key.ends_with("Bytes") || (section == "Storage" && key.eq_ignore_ascii_case("size"))
+}
+
+fn format_hwmon_value(key: &str, value: &str) -> Option<String> {
+    let raw = value.trim().parse::<i64>().ok()?;
+
+    if key.starts_with("temp") && key.ends_with("_input") {
+        return Some(format!("{value} ({:.2} °C)", raw as f64 / 1000.0));
+    }
+    if key.starts_with("fan") && key.ends_with("_input") {
+        return Some(format!("{value} RPM"));
+    }
+    if key.starts_with("in") && key.ends_with("_input") {
+        return Some(format!("{value} ({:.3} V)", raw as f64 / 1000.0));
+    }
+    if key.starts_with("curr") && key.ends_with("_input") {
+        return Some(format!("{value} ({:.3} A)", raw as f64 / 1000.0));
+    }
+    if key.starts_with("power")
+        && (key.ends_with("_input") || key.ends_with("_average") || key.ends_with("_highest"))
+    {
+        return Some(format!("{value} ({:.3} W)", raw as f64 / 1_000_000.0));
+    }
+    if key.starts_with("energy") && key.ends_with("_input") {
+        return Some(format!("{value} ({:.3} J)", raw as f64 / 1_000_000.0));
+    }
+    if key.starts_with("humidity") && key.ends_with("_input") {
+        return Some(format!("{value} ({:.2} %RH)", raw as f64 / 1000.0));
+    }
+
+    None
+}
+
+fn format_power_supply_value(key: &str, value: &str) -> Option<String> {
+    let raw = value.trim().parse::<i64>().ok()?;
+
+    if key == "capacity" {
+        return Some(format!("{value} %"));
+    }
+    if key.starts_with("energy_") {
+        return Some(format!("{value} ({:.3} Wh)", raw as f64 / 1_000_000.0));
+    }
+    if key.starts_with("charge_") {
+        return Some(format!("{value} ({:.3} Ah)", raw as f64 / 1_000_000.0));
+    }
+    if key.starts_with("voltage_") {
+        return Some(format!("{value} ({:.3} V)", raw as f64 / 1_000_000.0));
+    }
+    if key.starts_with("current_") {
+        return Some(format!("{value} ({:.3} A)", raw as f64 / 1_000_000.0));
+    }
+    if key.starts_with("power_") {
+        return Some(format!("{value} ({:.3} W)", raw as f64 / 1_000_000.0));
+    }
+
+    None
 }
 
 fn format_bytes(bytes: u64) -> String {
@@ -318,10 +390,26 @@ mod tests {
     }
 
     #[test]
-    fn formats_network_bit_rate() {
+    fn formats_network_rates() {
         assert_eq!(
             display_value("Network Adapters", "SpeedBitsPerSecond", "1000000000"),
             "1000000000 (1.00 Gbit/s)"
+        );
+        assert_eq!(
+            display_value("Network Adapters", "speed", "2500"),
+            "2500 Mbit/s (2.50 Gbit/s)"
+        );
+    }
+
+    #[test]
+    fn formats_linux_sensor_units() {
+        assert_eq!(
+            display_value("Hardware Sensors / hwmon", "temp1_input", "42500"),
+            "42500 (42.50 °C)"
+        );
+        assert_eq!(
+            display_value("Power / Battery", "energy_full", "60000000"),
+            "60000000 (60.000 Wh)"
         );
     }
 
