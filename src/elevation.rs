@@ -55,20 +55,21 @@ pub fn is_elevated() -> bool {
 pub fn run_elevated_child(
     exe: &Path,
     handoff: &Path,
+    token: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
     {
-        return run_windows(exe, handoff);
+        return run_windows(exe, handoff, token);
     }
 
     #[cfg(target_os = "macos")]
     {
-        return run_macos(exe, handoff);
+        return run_macos(exe, handoff, token);
     }
 
     #[cfg(target_os = "linux")]
     {
-        return run_linux(exe, handoff);
+        return run_linux(exe, handoff, token);
     }
 
     #[allow(unreachable_code)]
@@ -76,12 +77,17 @@ pub fn run_elevated_child(
 }
 
 #[cfg(target_os = "windows")]
-fn run_windows(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_windows(
+    exe: &Path,
+    handoff: &Path,
+    token: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let powershell = command::windows_powershell()?;
     let exe = powershell_single_quote(&exe.to_string_lossy());
     let handoff = powershell_single_quote(&handoff.to_string_lossy());
+    let token = powershell_single_quote(token);
     let script = format!(
-        "$ErrorActionPreference='Stop'; try {{ $a = '--elevated-child \"' + '{handoff}' + '\"'; $p = Start-Process -FilePath '{exe}' -Verb RunAs -ArgumentList $a -Wait -PassThru; exit [int]$p.ExitCode }} catch {{ exit 1 }}"
+        "$ErrorActionPreference='Stop'; try {{ $a = '--elevated-child \"' + '{handoff}' + '\" \"' + '{token}' + '\"'; $p = Start-Process -FilePath '{exe}' -Verb RunAs -ArgumentList $a -Wait -PassThru; exit [int]$p.ExitCode }} catch {{ exit 1 }}"
     );
 
     let status = Command::new(powershell)
@@ -103,13 +109,18 @@ fn run_windows(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Err
 }
 
 #[cfg(target_os = "macos")]
-fn run_macos(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_macos(
+    exe: &Path,
+    handoff: &Path,
+    token: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let osascript = command::macos_program("osascript")
         .ok_or("trusted /usr/bin/osascript was not found")?;
     let shell_command = format!(
-        "{} --elevated-child {}",
+        "{} --elevated-child {} {}",
         shell_single_quote(&exe.to_string_lossy()),
-        shell_single_quote(&handoff.to_string_lossy())
+        shell_single_quote(&handoff.to_string_lossy()),
+        shell_single_quote(token)
     );
     let script = format!(
         "do shell script \"{}\" with administrator privileges",
@@ -125,12 +136,17 @@ fn run_macos(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error
 }
 
 #[cfg(target_os = "linux")]
-fn run_linux(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_linux(
+    exe: &Path,
+    handoff: &Path,
+    token: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(pkexec) = command::linux_program("pkexec") {
         let status = Command::new(pkexec)
             .arg(exe)
             .arg("--elevated-child")
             .arg(handoff)
+            .arg(token)
             .status()?;
         if status.success() {
             return Ok(());
@@ -143,6 +159,7 @@ fn run_linux(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error
             .arg(exe)
             .arg("--elevated-child")
             .arg(handoff)
+            .arg(token)
             .status()?;
         if status.success() {
             return Ok(());
