@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+pub const REPORT_SCHEMA_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemReport {
     pub meta: ReportMeta,
@@ -10,6 +12,7 @@ pub struct SystemReport {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportMeta {
+    pub schema_version: u32,
     pub app_name: String,
     pub app_version: String,
     pub generated_at: String,
