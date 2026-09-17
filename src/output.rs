@@ -139,7 +139,7 @@ pub fn write_reports(
 ) -> Result<(PathBuf, PathBuf), Box<dyn std::error::Error>> {
     fs::create_dir_all(output_dir)?;
 
-    let stamp = Local::now().format("%Y%m%d_%H%M%S_%3f");
+    let stamp = Local::now().format("%Y%m%d_%H%M%S_%f");
     let txt_path = output_dir.join(format!("HowAmI_Report_{stamp}.txt"));
     let json_path = output_dir.join(format!("HowAmI_Report_{stamp}.json"));
 
