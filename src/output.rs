@@ -5,6 +5,40 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(target_os = "windows")]
+#[repr(C)]
+struct Guid {
+    data1: u32,
+    data2: u16,
+    data3: u16,
+    data4: [u8; 8],
+}
+
+#[cfg(target_os = "windows")]
+#[link(name = "shell32")]
+extern "system" {
+    fn SHGetKnownFolderPath(
+        rfid: *const Guid,
+        dw_flags: u32,
+        token: *mut std::ffi::c_void,
+        path: *mut *mut u16,
+    ) -> i32;
+}
+
+#[cfg(target_os = "windows")]
+#[link(name = "ole32")]
+extern "system" {
+    fn CoTaskMemFree(memory: *mut std::ffi::c_void);
+}
+
+#[cfg(target_os = "windows")]
+const FOLDERID_DESKTOP: Guid = Guid {
+    data1: 0xB4BFCC3A,
+    data2: 0xDB2C,
+    data3: 0x424C,
+    data4: [0xB0, 0x29, 0x7F, 0xE9, 0x9A, 0x87, 0xC6, 0x41],
+};
+
 pub fn resolve_output_dir(explicit: Option<PathBuf>) -> PathBuf {
     if let Some(path) = explicit {
         return path;
@@ -61,42 +95,7 @@ pub fn resolve_output_dir(explicit: Option<PathBuf>) -> PathBuf {
 
 #[cfg(target_os = "windows")]
 fn windows_desktop() -> Option<PathBuf> {
-    use std::{
-        ffi::{c_void, OsString},
-        os::windows::ffi::OsStringExt,
-        ptr,
-        slice,
-    };
-
-    #[repr(C)]
-    struct Guid {
-        data1: u32,
-        data2: u16,
-        data3: u16,
-        data4: [u8; 8],
-    }
-
-    #[link(name = "shell32")]
-    extern "system" {
-        fn SHGetKnownFolderPath(
-            rfid: *const Guid,
-            dw_flags: u32,
-            token: *mut c_void,
-            path: *mut *mut u16,
-        ) -> i32;
-    }
-
-    #[link(name = "ole32")]
-    extern "system" {
-        fn CoTaskMemFree(memory: *mut c_void);
-    }
-
-    const FOLDERID_DESKTOP: Guid = Guid {
-        data1: 0xB4BFCC3A,
-        data2: 0xDB2C,
-        data3: 0x424C,
-        data4: [0xB0, 0x29, 0x7F, 0xE9, 0x9A, 0x87, 0xC6, 0x41],
-    };
+    use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr, slice};
 
     let mut raw: *mut u16 = ptr::null_mut();
     let result = unsafe {
