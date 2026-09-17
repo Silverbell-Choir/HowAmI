@@ -18,6 +18,8 @@ HowAmI is an open-source Windows, macOS, and Linux utility that locally collects
 - 실행 한 번으로 OS와 장치가 노출하는 시스템 정보를 최대한 수집합니다.
 - 값이 없거나 확인할 수 없으면 추측하지 않습니다.
 - 결과는 기본적으로 사용자의 Desktop에 `HowAmI_Report_*.txt`와 `HowAmI_Report_*.json`으로 생성합니다.
+- TXT는 용량·네트워크 속도·일부 하드웨어 코드에 사람이 읽기 쉬운 보조 표기를 제공합니다.
+- JSON은 수집된 원시 값을 최대한 유지하며 `meta.schema_version`으로 형식 버전을 표시합니다.
 - HowAmI에는 서버 업로드, 원격 분석, 텔레메트리 기능을 구현하지 않습니다.
 - 관리자/root 권한이 필요한 수집은 별도 elevated child에서만 수행하고 최종 리포트는 일반 사용자 프로세스가 작성합니다.
 
@@ -63,7 +65,7 @@ HowAmI is an open-source Windows, macOS, and Linux utility that locally collects
 
 ### 권한과 보안
 
-HowAmI를 일반 권한으로 실행하면 부모 프로세스는 그대로 일반 사용자 권한을 유지합니다. 추가 권한이 필요할 때만 별도 관리자/root child가 하드웨어 수집을 수행하고 임시 handoff 파일로 결과를 돌려준 뒤 종료합니다. 최종 TXT/JSON은 사용자 프로세스가 작성합니다.
+HowAmI를 일반 권한으로 실행하면 부모 프로세스는 그대로 일반 사용자 권한을 유지합니다. 추가 권한이 필요할 때만 별도 관리자/root child가 하드웨어 수집을 수행하고 인증된 임시 handoff 파일로 결과를 돌려준 뒤 종료합니다. 최종 TXT/JSON은 사용자 프로세스가 작성합니다.
 
 관리자/root 환경에서 PATH 검색으로 다른 실행파일이 선택되는 위험을 줄이기 위해 외부 시스템 도구는 신뢰된 시스템 경로만 사용합니다. 수집용 외부 프로세스에는 timeout도 적용합니다.
 
@@ -104,7 +106,7 @@ HowAmI --no-elevate
 
 ### 빌드
 
-Rust stable toolchain이 필요합니다.
+Rust `1.74+` stable toolchain이 필요합니다.
 
 ```bash
 cargo build --release
@@ -119,7 +121,9 @@ GitHub Actions/유료 CI는 사용하지 않습니다. 각 대상 OS/아키텍�
 
 자세한 내용: [`docs/BUILD.md`](docs/BUILD.md)  
 아키텍처: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
-개인정보: [`docs/PRIVACY.md`](docs/PRIVACY.md)
+개인정보: [`docs/PRIVACY.md`](docs/PRIVACY.md)  
+보안: [`SECURITY.md`](SECURITY.md)  
+수동 릴리스 절차: [`docs/RELEASE.md`](docs/RELEASE.md)
 
 ---
 
@@ -130,6 +134,8 @@ GitHub Actions/유료 CI는 사용하지 않습니다. 각 대상 OS/아키텍�
 - Collect as much system information as the OS and devices expose in one run.
 - Never guess a value that cannot be discovered reliably.
 - Write `HowAmI_Report_*.txt` and `HowAmI_Report_*.json` to the user's Desktop by default.
+- Add human-readable annotations in TXT for capacities, network rates, and selected hardware codes.
+- Preserve discovered values as closely as practical in JSON and expose the format version as `meta.schema_version`.
 - Do not implement server upload, remote analysis, or telemetry.
 - Perform Administrator/root-only collection in a separate elevated child and write final reports from the normal user process.
 
@@ -175,7 +181,7 @@ GitHub Actions/유료 CI는 사용하지 않습니다. 각 대상 OS/아키텍�
 
 ### Privileges and security
 
-When HowAmI starts as a normal user, the parent process stays unprivileged. A separate Administrator/root child performs only the collection that benefits from elevation, returns the result through a temporary handoff file, and exits. The normal user process writes the final TXT/JSON files.
+When HowAmI starts as a normal user, the parent process stays unprivileged. A separate Administrator/root child performs only the collection that benefits from elevation, returns the result through an authenticated temporary handoff file, and exits. The normal user process writes the final TXT/JSON files.
 
 External helper programs are launched only from trusted system locations rather than arbitrary PATH matches while elevated. Collector subprocesses also have timeouts.
 
@@ -216,7 +222,7 @@ HowAmI --no-elevate
 
 ### Build
 
-A stable Rust toolchain is required.
+A stable Rust `1.74+` toolchain is required.
 
 ```bash
 cargo build --release
@@ -231,7 +237,9 @@ No GitHub Actions or paid CI are used. Builds and physical-device validation are
 
 Details: [`docs/BUILD.md`](docs/BUILD.md)  
 Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
-Privacy: [`docs/PRIVACY.md`](docs/PRIVACY.md)
+Privacy: [`docs/PRIVACY.md`](docs/PRIVACY.md)  
+Security: [`SECURITY.md`](SECURITY.md)  
+Manual release procedure: [`docs/RELEASE.md`](docs/RELEASE.md)
 
 ## License
 
