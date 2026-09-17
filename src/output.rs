@@ -17,7 +17,8 @@ struct Guid {
 #[cfg(target_os = "windows")]
 #[link(name = "shell32")]
 extern "system" {
-    fn SHGetKnownFolderPath(
+    #[link_name = "SHGetKnownFolderPath"]
+    fn sh_get_known_folder_path(
         rfid: *const Guid,
         dw_flags: u32,
         token: *mut std::ffi::c_void,
@@ -28,7 +29,8 @@ extern "system" {
 #[cfg(target_os = "windows")]
 #[link(name = "ole32")]
 extern "system" {
-    fn CoTaskMemFree(memory: *mut std::ffi::c_void);
+    #[link_name = "CoTaskMemFree"]
+    fn co_task_mem_free(memory: *mut std::ffi::c_void);
 }
 
 #[cfg(target_os = "windows")]
@@ -99,7 +101,7 @@ fn windows_desktop() -> Option<PathBuf> {
 
     let mut raw: *mut u16 = ptr::null_mut();
     let result = unsafe {
-        SHGetKnownFolderPath(&FOLDERID_DESKTOP, 0, ptr::null_mut(), &mut raw)
+        sh_get_known_folder_path(&FOLDERID_DESKTOP, 0, ptr::null_mut(), &mut raw)
     };
     if result < 0 || raw.is_null() {
         return None;
@@ -111,7 +113,7 @@ fn windows_desktop() -> Option<PathBuf> {
             len += 1;
         }
         let path = PathBuf::from(OsString::from_wide(slice::from_raw_parts(raw, len)));
-        CoTaskMemFree(raw.cast());
+        co_task_mem_free(raw.cast());
         Some(path)
     }
 }
