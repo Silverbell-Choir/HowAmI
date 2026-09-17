@@ -7,6 +7,7 @@ use std::{
 pub fn collect() -> Vec<Section> {
     vec![
         collect_gpus(),
+        collect_firmware_security(),
         collect_power_supplies(),
         collect_hwmon(),
         collect_audio(),
@@ -71,6 +72,69 @@ fn collect_gpus() -> Section {
         }
 
         section.push(record);
+    }
+
+    section
+}
+
+fn collect_firmware_security() -> Section {
+    let mut section = Section::new("Firmware Security");
+    let mut boot = DeviceRecord::new("Boot Firmware");
+
+    let efi_root = Path::new("/sys/firmware/efi");
+    boot.insert(
+        "BootMode",
+        if efi_root.is_dir() { "UEFI" } else { "Legacy / non-UEFI" },
+    );
+
+    let efivars = efi_root.join("efivars");
+    if let Ok(entries) = fs::read_dir(&efivars) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with("SecureBoot-") {
+                continue;
+            }
+            if let Ok(bytes) = fs::read(entry.path()) {
+                // efivarfs prepends a 4-byte attributes field to the variable data.
+                if bytes.len() >= 5 {
+                    boot.insert(
+                        "SecureBoot",
+                        if bytes[4] == 1 { "Enabled" } else { "Disabled" },
+                    );
+                }
+            }
+            break;
+        }
+    }
+    section.push(boot);
+
+    let tpm_root = Path::new("/sys/class/tpm");
+    if let Ok(entries) = fs::read_dir(tpm_root) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with("tpm") {
+                continue;
+            }
+            let path = entry.path();
+            let mut record = DeviceRecord::new(name);
+            for field in ["tpm_version_major", "caps"] {
+                if let Some(value) = read_trimmed(path.join(field)) {
+                    record.insert(field, value);
+                }
+            }
+            if let Some(driver) = symlink_file_name(path.join("device/driver")) {
+                record.insert("driver", driver.clone());
+                if let Some(version) =
+                    read_trimmed(Path::new("/sys/module").join(&driver).join("version"))
+                {
+                    record.insert("driver_version", version);
+                }
+            }
+            if let Some(uevent) = read_trimmed(path.join("device/uevent")) {
+                record.insert("device_uevent", uevent.replace('\n', ", "));
+            }
+            section.push(record);
+        }
     }
 
     section
