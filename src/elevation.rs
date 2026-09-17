@@ -1,88 +1,90 @@
-use std::{env, path::Path, process::Command};
+use crate::command;
+use std::{path::Path, process::Command, time::Duration};
 
-#[derive(Debug)]
-pub struct ElevationState {
-    pub elevated: bool,
-    pub warning: Option<String>,
+pub fn is_elevated() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        let Ok(powershell) = command::windows_powershell() else {
+            return false;
+        };
+        let script = "([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)";
+        let mut process = Command::new(powershell);
+        process.args(["-NoProfile", "-NonInteractive", "-Command", script]);
+        return command::run_capture(&mut process, Duration::from_secs(5))
+            .ok()
+            .filter(|output| output.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|text| text.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let Some(id) = command::macos_program("id") else {
+            return false;
+        };
+        let mut process = Command::new(id);
+        process.arg("-u");
+        return command::run_capture(&mut process, Duration::from_secs(5))
+            .ok()
+            .filter(|output| output.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|text| text.trim() == "0")
+            .unwrap_or(false);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let Some(id) = command::linux_program("id") else {
+            return false;
+        };
+        let mut process = Command::new(id);
+        process.arg("-u");
+        return command::run_capture(&mut process, Duration::from_secs(5))
+            .ok()
+            .filter(|output| output.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|text| text.trim() == "0")
+            .unwrap_or(false);
+    }
+
+    #[allow(unreachable_code)]
+    false
 }
 
-#[derive(Debug)]
-pub enum ElevationOutcome {
-    Continue(ElevationState),
-    Relaunched,
-}
-
-pub fn ensure_elevated(
-    no_elevate: bool,
-    relaunch_marker: bool,
-) -> Result<ElevationOutcome, Box<dyn std::error::Error>> {
-    let elevated = is_elevated();
-    if elevated || no_elevate {
-        return Ok(ElevationOutcome::Continue(ElevationState {
-            elevated,
-            warning: if no_elevate && !elevated {
-                Some("Elevation was disabled; some hardware data may be unavailable. / 관리자 권한 상승이 비활성화되어 일부 정보가 누락될 수 있습니다.".into())
-            } else {
-                None
-            },
-        }));
+pub fn run_elevated_child(
+    exe: &Path,
+    handoff: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(target_os = "windows")]
+    {
+        return run_windows(exe, handoff);
     }
 
-    if relaunch_marker {
-        return Ok(ElevationOutcome::Continue(ElevationState {
-            elevated: false,
-            warning: Some("Elevation did not succeed; continuing with standard-user access. / 관리자 권한 상승에 실패하여 일반 권한으로 계속합니다.".into()),
-        }));
+    #[cfg(target_os = "macos")]
+    {
+        return run_macos(exe, handoff);
     }
 
-    let exe = env::current_exe()?;
-    match relaunch_as_admin(&exe) {
-        Ok(true) => Ok(ElevationOutcome::Relaunched),
-        Ok(false) => Ok(ElevationOutcome::Continue(ElevationState {
-            elevated: false,
-            warning: Some("Administrator/root permission was not granted; some hardware data may be unavailable. / 관리자/root 권한이 허용되지 않아 일부 정보가 누락될 수 있습니다.".into()),
-        })),
-        Err(error) => Ok(ElevationOutcome::Continue(ElevationState {
-            elevated: false,
-            warning: Some(format!(
-                "Failed to request elevation: {error}. Continuing with reduced access. / 권한 상승 요청 실패: {error}. 제한된 권한으로 계속합니다."
-            )),
-        })),
+    #[cfg(target_os = "linux")]
+    {
+        return run_linux(exe, handoff);
     }
+
+    #[allow(unreachable_code)]
+    Err("privilege elevation is not supported on this operating system".into())
 }
 
 #[cfg(target_os = "windows")]
-fn is_elevated() -> bool {
-    let script = "([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)";
-    let output = Command::new("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
-        .output();
-
-    output
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|text| text.trim().eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
-}
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-fn is_elevated() -> bool {
-    Command::new("id")
-        .arg("-u")
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|text| text.trim() == "0")
-        .unwrap_or(false)
-}
-
-#[cfg(target_os = "windows")]
-fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
-    let path = powershell_single_quote(&exe.to_string_lossy());
+fn run_windows(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let powershell = command::windows_powershell()?;
+    let exe = powershell_single_quote(&exe.to_string_lossy());
+    let handoff = powershell_single_quote(&handoff.to_string_lossy());
     let script = format!(
-        "Start-Process -FilePath '{path}' -Verb RunAs -ArgumentList '--elevated'"
+        "$a = '--elevated-child \"' + '{handoff}' + '\"'; $p = Start-Process -FilePath '{exe}' -Verb RunAs -ArgumentList $a -Wait -PassThru; exit $p.ExitCode"
     );
-    let status = Command::new("powershell.exe")
+
+    let status = Command::new(powershell)
         .args([
             "-NoProfile",
             "-NonInteractive",
@@ -92,51 +94,63 @@ fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
             &script,
         ])
         .status()?;
-    Ok(status.success())
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("UAC elevation was cancelled or the elevated collector failed ({status})").into())
+    }
 }
 
 #[cfg(target_os = "macos")]
-fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
-    let home = env::var("HOME").unwrap_or_else(|_| "/Users/Shared".into());
-    let command = format!(
-        "HOME={} {} --elevated",
-        shell_single_quote(&home),
-        shell_single_quote(&exe.to_string_lossy())
+fn run_macos(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let osascript = command::macos_program("osascript")
+        .ok_or("trusted /usr/bin/osascript was not found")?;
+    let shell_command = format!(
+        "{} --elevated-child {}",
+        shell_single_quote(&exe.to_string_lossy()),
+        shell_single_quote(&handoff.to_string_lossy())
     );
     let script = format!(
         "do shell script \"{}\" with administrator privileges",
-        applescript_double_quote(&command)
+        applescript_double_quote(&shell_command)
     );
-    let status = Command::new("osascript").args(["-e", &script]).status()?;
-    Ok(status.success())
+
+    let status = Command::new(osascript).args(["-e", &script]).status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("administrator authorization was cancelled or the elevated collector failed ({status})").into())
+    }
 }
 
 #[cfg(target_os = "linux")]
-fn relaunch_as_admin(exe: &Path) -> Result<bool, Box<dyn std::error::Error>> {
-    let home = env::var("HOME").unwrap_or_else(|_| "/root".into());
-    let home_arg = format!("HOME={home}");
-
-    if command_exists("pkexec") {
-        let status = Command::new("pkexec")
-            .arg("/usr/bin/env")
-            .arg(&home_arg)
+fn run_linux(exe: &Path, handoff: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(pkexec) = command::linux_program("pkexec") {
+        let status = Command::new(pkexec)
             .arg(exe)
-            .arg("--elevated")
+            .arg("--elevated-child")
+            .arg(handoff)
             .status()?;
-        return Ok(status.success());
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("pkexec authorization was cancelled or failed ({status})").into());
     }
 
-    if command_exists("sudo") {
-        let status = Command::new("sudo")
-            .arg("/usr/bin/env")
-            .arg(&home_arg)
+    if let Some(sudo) = command::linux_program("sudo") {
+        let status = Command::new(sudo)
             .arg(exe)
-            .arg("--elevated")
+            .arg("--elevated-child")
+            .arg(handoff)
             .status()?;
-        return Ok(status.success());
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("sudo authorization was cancelled or failed ({status})").into());
     }
 
-    Ok(false)
+    Err("neither pkexec nor sudo is available in trusted system paths".into())
 }
 
 #[cfg(target_os = "windows")]
@@ -152,13 +166,4 @@ fn shell_single_quote(value: &str) -> String {
 #[cfg(target_os = "macos")]
 fn applescript_double_quote(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-#[cfg(target_os = "linux")]
-fn command_exists(name: &str) -> bool {
-    Command::new("sh")
-        .args(["-c", &format!("command -v {name} >/dev/null 2>&1")])
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
 }
