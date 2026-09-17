@@ -28,7 +28,7 @@ elevated child는 다음을 모두 확인한 뒤에만 파일을 덮어씁니다
 4. 파일의 기존 token과 인자로 받은 token이 정확히 일치하는지 확인
 5. HowAmI handoff marker 형식인지 확인
 
-검증이 끝난 뒤에만 수집 JSON을 기록합니다. 부모 프로세스는 결과를 읽은 후 handoff 파일을 삭제합니다.
+검증이 끝난 뒤에는 **검증에 사용한 동일한 열린 파일 핸들**을 그대로 `truncate/write`에 사용합니다. token 확인 이후 경로를 다시 열지 않으므로, 검증과 privileged write 사이에 경로가 다른 파일로 교체되는 TOCTOU 위험을 줄입니다. 부모 프로세스는 결과를 읽은 후 handoff 파일을 삭제합니다.
 
 이 token은 암호학적 비밀키를 목적으로 하는 것이 아니라, 임의로 숨겨진 내부 인자만 호출하여 elevated HowAmI가 무관한 파일을 truncate하는 것을 방지하기 위한 handoff 인증 표식입니다.
 
@@ -66,7 +66,7 @@ Before overwriting the file, the elevated child verifies all of the following:
 4. the token already stored in the file exactly matches the token supplied to the child,
 5. the value uses the expected HowAmI handoff marker format.
 
-Only then is collection JSON written. The parent reads the result and removes the handoff file afterward.
+After validation, the child reuses **the same already-open authenticated file handle** for truncate/write. It does not reopen the path between token validation and the privileged write, reducing a path-replacement TOCTOU risk. The parent reads the result and removes the handoff file afterward.
 
 The token is not intended to be a cryptographic secret. Its purpose is to prevent someone from invoking only the hidden internal argument and causing an elevated HowAmI process to truncate an unrelated file.
 
